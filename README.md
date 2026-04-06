@@ -146,7 +146,7 @@ Once connected, just talk to your AI tool naturally:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SCRUMDO_TOKEN` | — | **Required.** API token from Settings → API Tokens |
-| `SCRUMDO_BASE_URL` | `https://app.scrumdo.com` | API base URL |
+| `SCRUMDO_BASE_URL` | `https://app.spryng.io` | API base URL |
 | `SCRUMDO_ORG` | — | Your organization slug |
 | `SCRUMDO_PROJECT` | — | Default project slug |
 

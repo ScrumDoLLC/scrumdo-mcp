@@ -26,7 +26,7 @@ class Config:
     """
 
     base_url: str = _env("SCRUMDO_BASE_URL", "SPRYNG_BASE_URL",
-                          default="https://app.scrumdo.com").rstrip("/")
+                          default="https://app.spryng.io").rstrip("/")
     token: str = _env("SCRUMDO_TOKEN", "SPRYNG_TOKEN")
     org: str = _env("SCRUMDO_ORG", "SPRYNG_ORG", default="")
     project: str = _env("SCRUMDO_PROJECT", "SPRYNG_PROJECT", default="")
