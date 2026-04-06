@@ -23,7 +23,14 @@ pip install scrumdo-mcp
 
 **1 — Install**
 ```bash
+# To run the server only:
 pip install git+https://github.com/ScrumDoLLC/scrumdo-mcp.git
+
+# To run tests too:
+git clone https://github.com/ScrumDoLLC/scrumdo-mcp.git
+cd scrumdo-mcp
+pip install -e ".[dev]"
+pytest tests/ -v
 ```
 
 **2 — Get your token**
