@@ -62,7 +62,6 @@ scrumdo-mcp = "spryng_mcp.server:main"
 packages = ["spryng_mcp"]
 exclude = [
     "tests/",
-    "test_live.py",
     ".env*",
 ]
 
@@ -70,7 +69,6 @@ exclude = [
 exclude = [
     ".venv/",
     "tests/",
-    "test_live.py",
     ".env*",
     "dist/",
 ]
