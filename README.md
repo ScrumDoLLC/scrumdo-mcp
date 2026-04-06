@@ -12,6 +12,52 @@ Once installed, your AI assistant can read cards, move them, create tasks, post 
 pip install scrumdo-mcp
 ```
 
+> **Pre-release / before PyPI publish:** install directly from GitHub:
+> ```bash
+> pip install git+https://github.com/ScrumDoLLC/scrumdo-mcp.git
+> ```
+
+---
+
+## Cursor quick-start
+
+**1 — Install**
+```bash
+pip install git+https://github.com/ScrumDoLLC/scrumdo-mcp.git
+```
+
+**2 — Get your token**
+
+Log in to ScrumDo → your org → **Settings → API Tokens → Create Token**. Copy it — shown once only.
+
+**3 — Add to `~/.cursor/mcp.json`**
+
+```json
+{
+  "mcpServers": {
+    "scrumdo": {
+      "command": "scrumdo-mcp",
+      "env": {
+        "SCRUMDO_TOKEN": "your-token-here",
+        "SCRUMDO_ORG": "your-org-slug",
+        "SCRUMDO_PROJECT": "your-default-project-slug"
+      }
+    }
+  }
+}
+```
+
+Your org and project slugs are the short names in your board URL:
+`app.scrumdo.com/`**`my-company`**`/`**`engineering`**
+
+**4 — Restart Cursor**
+
+Done. In any Cursor chat you can now ask:
+- *"What cards are in the current sprint?"*
+- *"Move ENG-42 to In Review"*
+- *"Add a comment to ENG-42: PR is up for review"*
+- *"List all cards assigned to me"*
+
 ---
 
 ## Setup
