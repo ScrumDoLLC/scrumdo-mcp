@@ -44,9 +44,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://www.scrumdo.com"
-Documentation = "https://github.com/ScrumDoLLC/MassSense/tree/main/mcp"
-Repository = "https://github.com/ScrumDoLLC/MassSense"
-"Bug Tracker" = "https://github.com/ScrumDoLLC/MassSense/issues"
+Documentation = "https://github.com/ScrumDoLLC/scrumdo-mcp#readme"
+Repository = "https://github.com/ScrumDoLLC/scrumdo-mcp"
+"Bug Tracker" = "https://github.com/ScrumDoLLC/scrumdo-mcp/issues"
 
 [project.optional-dependencies]
 dev = [
