@@ -63,7 +63,6 @@ packages = ["spryng_mcp"]
 exclude = [
     "tests/",
     "test_live.py",
-    "update_on914.py",
     ".env*",
 ]
 
@@ -72,7 +71,6 @@ exclude = [
     ".venv/",
     "tests/",
     "test_live.py",
-    "update_on914.py",
     ".env*",
     "dist/",
 ]
