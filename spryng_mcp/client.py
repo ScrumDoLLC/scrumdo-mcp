@@ -176,14 +176,14 @@ class SpryngClient:
     # ── Comments ───────────────────────────────────────────────────────────────
 
     async def list_comments(self, card_id: int) -> list[dict]:
-        data = await self.get(Config.api("comments/story/"), story=card_id)
+        data = await self.get(Config.api(f"comments/story/{card_id}/"))
         return data if isinstance(data, list) else data.get("comments", data)
 
     async def add_comment(self, card_id: int, body: str) -> dict:
-        return await self.post(Config.api("comments/story/"), {"story": card_id, "comment": body})
+        return await self.post(Config.api(f"comments/story/{card_id}/"), {"comment": body})
 
-    async def delete_comment(self, comment_id: int) -> int:
-        return await self.delete(Config.api(f"comments/story/{comment_id}/"))
+    async def delete_comment(self, story_id: int, comment_id: int) -> int:
+        return await self.delete(Config.api(f"comments/story/{story_id}/comment/{comment_id}/"))
 
     # ── Custom fields ──────────────────────────────────────────────────────────
 

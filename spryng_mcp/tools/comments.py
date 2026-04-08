@@ -41,13 +41,15 @@ def register(mcp: FastMCP) -> None:
             return await c.add_comment(card["id"], body)
 
     @mcp.tool()
-    async def delete_comment(comment_id: int) -> str:
+    async def delete_comment(card_ref: str, comment_id: int) -> str:
         """
-        Delete a comment by its id.
+        Delete a comment from a card.
 
         Args:
-            comment_id: Numeric comment id from list_comments.
+            card_ref:   Card reference, e.g. 'ON-914'.
+            comment_id: Numeric comment id from list_comments().
         """
         async with SpryngClient() as c:
-            status = await c.delete_comment(comment_id)
+            card = await c.get_card(card_ref)
+            status = await c.delete_comment(card["id"], comment_id)
         return f"Comment {comment_id} deleted (HTTP {status})"
