@@ -126,6 +126,7 @@ def register(mcp: FastMCP) -> None:
         description: str | None = None,
         points: int | None = None,
         status: str | None = None,
+        iteration_id: int | None = None,
         assignee_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
         extra_fields: dict[str, str] | None = None,
@@ -141,6 +142,8 @@ def register(mcp: FastMCP) -> None:
             description:   New description (markdown).
             points:        New story points.
             status:        New status string.
+            iteration_id:  Move card to this iteration/sprint id. Use list_iterations()
+                           to find ids. Pass 0 to remove from all iterations.
             assignee_ids:  Replace assignee list.
             label_ids:     Replace label list.
             extra_fields:  Merge into existing custom fields. Existing keys not
@@ -157,6 +160,8 @@ def register(mcp: FastMCP) -> None:
             body["points"] = points
         if status is not None:
             body["status"] = status
+        if iteration_id is not None:
+            body["iteration"] = iteration_id if iteration_id != 0 else None
         if assignee_ids is not None:
             body["assignees"] = assignee_ids
         if label_ids is not None:
@@ -183,6 +188,22 @@ def register(mcp: FastMCP) -> None:
         """
         async with SpryngClient() as c:
             return await c.update_card(card_ref, {"cell": cell_id})
+
+    @mcp.tool()
+    async def move_card_to_iteration(card_ref: str, iteration_id: int) -> dict:
+        """
+        Move a card into an iteration (sprint).
+
+        Args:
+            card_ref:     Card reference, e.g. 'ON-914'.
+            iteration_id: Target iteration id. Use list_iterations() to find ids.
+                          Pass 0 to remove the card from its current iteration.
+
+        Returns the updated card.
+        """
+        async with SpryngClient() as c:
+            body = {"iteration": iteration_id if iteration_id != 0 else None}
+            return await c.update_card(card_ref, body)
 
     @mcp.tool()
     async def set_card_field(card_ref: str, field_id: int, value: str) -> dict:
