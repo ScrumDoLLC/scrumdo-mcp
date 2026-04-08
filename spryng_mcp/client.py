@@ -223,6 +223,21 @@ class SpryngClient:
             fields,
         )
 
+    # ── Blockers ───────────────────────────────────────────────────────────────
+
+    async def list_blockers(self, card_ref: str) -> list[dict]:
+        story_id = await self._resolve_card_id(card_ref)
+        data = await self.get(Config.project_url(f"stories/{story_id}/blockers/blocker/"))
+        return data if isinstance(data, list) else data.get("blockers", data)
+
+    async def block_card(self, card_ref: str, body: dict[str, Any]) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        return await self.post(Config.project_url(f"stories/{story_id}/blockers/"), body)
+
+    async def unblock_card(self, card_ref: str, blocker_id: int, body: dict[str, Any]) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        return await self.put(Config.project_url(f"stories/{story_id}/blockers/{blocker_id}/"), body)
+
     # ── Members ────────────────────────────────────────────────────────────────
 
     async def list_members(self, project_slug: str | None = None) -> list[dict]:

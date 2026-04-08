@@ -26,6 +26,7 @@ from mcp.server.fastmcp import FastMCP
 from .config import Config
 from .tools import (
     activity,
+    blockers,
     boards,
     cards,
     comments,
@@ -76,6 +77,7 @@ activity log stays current and filterable.
 # ── Register all tool groups ───────────────────────────────────────────────────
 
 boards.register(mcp)
+blockers.register(mcp)
 cards.register(mcp)
 tasks.register(mcp)
 comments.register(mcp)

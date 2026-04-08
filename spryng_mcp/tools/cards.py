@@ -80,6 +80,7 @@ def register(mcp: FastMCP) -> None:
         summary: str,
         description: str = "",
         points: int | None = None,
+        due_date: str | None = None,
         cell_id: int | None = None,
         iteration_id: int | None = None,
         assignee_ids: list[int] | None = None,
@@ -93,9 +94,10 @@ def register(mcp: FastMCP) -> None:
             summary:       Card title / summary (required).
             description:   Rich text description (markdown supported).
             points:        Story points / estimate.
+            due_date:      Due date in YYYY-MM-DD format.
             cell_id:       Board column to place the card in.
             iteration_id:  Iteration/sprint to assign the card to.
-            assignee_ids:  List of user IDs to assign.
+            assignee_ids:  List of user IDs to assign. Use list_members() to find ids.
             label_ids:     List of label IDs to attach.
             extra_fields:  Custom field values as {field_id: value} dict.
 
@@ -106,6 +108,8 @@ def register(mcp: FastMCP) -> None:
             body["description"] = description
         if points is not None:
             body["points"] = points
+        if due_date:
+            body["due_date"] = due_date
         if cell_id is not None:
             body["cell"] = cell_id
         if iteration_id is not None:
@@ -126,6 +130,7 @@ def register(mcp: FastMCP) -> None:
         description: str | None = None,
         points: int | None = None,
         status: str | None = None,
+        due_date: str | None = None,
         iteration_id: int | None = None,
         assignee_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
@@ -142,9 +147,10 @@ def register(mcp: FastMCP) -> None:
             description:   New description (markdown).
             points:        New story points.
             status:        New status string.
+            due_date:      Due date in YYYY-MM-DD format. Pass empty string to clear.
             iteration_id:  Move card to this iteration/sprint id. Use list_iterations()
                            to find ids. Pass 0 to remove from all iterations.
-            assignee_ids:  Replace assignee list.
+            assignee_ids:  Replace assignee list. Use list_members() to find ids.
             label_ids:     Replace label list.
             extra_fields:  Merge into existing custom fields. Existing keys not
                            mentioned here will be preserved.
@@ -160,6 +166,8 @@ def register(mcp: FastMCP) -> None:
             body["points"] = points
         if status is not None:
             body["status"] = status
+        if due_date is not None:
+            body["due_date"] = due_date or None
         if iteration_id is not None:
             body["iteration"] = iteration_id if iteration_id != 0 else None
         if assignee_ids is not None:
