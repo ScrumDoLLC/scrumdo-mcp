@@ -12,11 +12,6 @@ Once installed, your AI assistant can read cards, move them, create tasks, post 
 pip install scrumdo-mcp
 ```
 
-> **Pre-release / before PyPI publish:** install directly from GitHub:
-> ```bash
-> pip install git+https://github.com/ScrumDoLLC/scrumdo-mcp.git
-> ```
-
 ---
 
 ## Cursor quick-start
@@ -24,7 +19,7 @@ pip install scrumdo-mcp
 **1 — Install**
 ```bash
 # To run the server only:
-pip install git+https://github.com/ScrumDoLLC/scrumdo-mcp.git
+pip install scrumdo-mcp
 
 # To run tests too:
 git clone https://github.com/ScrumDoLLC/scrumdo-mcp.git
@@ -120,16 +115,21 @@ Once connected, just talk to your AI tool naturally:
 "Create a sub-task on ENG-42: write release notes"
 "Search for cards about the login bug"
 "What did the team work on this week?"
+"Block ENG-42 — waiting on design approval"
+"Move ENG-42 to the Sprint 14 iteration"
+"Set the due date on ENG-42 to 2026-04-30"
+"Assign ENG-42 to Sarah"
 ```
 
 ---
 
-## Available tools (41 total)
+## Available tools (45 total)
 
 | Group | Tools |
 |-------|-------|
 | **Boards** | `list_boards`, `get_board`, `get_board_cells`, `list_iterations`, `list_labels`, `list_epics` |
-| **Cards** | `list_cards`, `get_card`, `find_card`, `create_card`, `update_card`, `move_card`, `set_card_field`, `archive_card`, `assign_card`, `add_card_label`, `remove_card_label` |
+| **Cards** | `list_cards`, `get_card`, `find_card`, `create_card`, `update_card`, `move_card`, `move_card_to_iteration`, `set_card_field`, `archive_card`, `assign_card`, `add_card_label`, `remove_card_label` |
+| **Blockers** | `list_blockers`, `block_card`, `unblock_card` |
 | **Tasks** | `list_tasks`, `create_task`, `complete_task`, `reopen_task`, `update_task`, `delete_task` |
 | **Comments** | `list_comments`, `add_comment`, `delete_comment` |
 | **Fields** | `list_custom_fields`, `get_card_field`, `get_all_card_fields` |
