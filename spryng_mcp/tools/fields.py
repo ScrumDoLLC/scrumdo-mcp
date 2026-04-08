@@ -31,24 +31,31 @@ def register(mcp: FastMCP) -> None:
             card_ref:  Card reference, e.g. 'ON-914'.
             field_id:  Numeric custom field id from list_custom_fields().
 
-        Returns {'field_id': …, 'value': …} or {'field_id': …, 'value': null}
+        Returns {'field_id': …, 'name': …, 'value': …} or {'field_id': …, 'value': null}
         if the field is not set.
         """
         async with SpryngClient() as c:
-            card = await c.get_card(card_ref)
-        extra = card.get("extra_fields") or {}
-        return {"field_id": field_id, "value": extra.get(str(field_id))}
+            story_id = await c._resolve_card_id(card_ref)
+            fields = await c.get_card_customfields(story_id)
+        for entry in fields:
+            if entry.get("field", {}).get("id") == field_id:
+                return {
+                    "field_id": field_id,
+                    "name": entry["field"].get("name"),
+                    "value": entry.get("value"),
+                }
+        return {"field_id": field_id, "value": None}
 
     @mcp.tool()
-    async def get_all_card_fields(card_ref: str) -> dict:
+    async def get_all_card_fields(card_ref: str) -> list[dict]:
         """
         Get all custom field values currently set on a card.
 
-        Returns a flat dict of {field_id: value} for every field that has a value.
+        Returns the full list of custom fields with their names and current values.
 
         Args:
             card_ref: Card reference, e.g. 'ON-914'.
         """
         async with SpryngClient() as c:
-            card = await c.get_card(card_ref)
-        return card.get("extra_fields") or {}
+            story_id = await c._resolve_card_id(card_ref)
+            return await c.get_card_customfields(story_id)

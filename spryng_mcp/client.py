@@ -107,7 +107,7 @@ class SpryngClient:
         r.raise_for_status()
         return r.json()
 
-    async def put(self, url: str, body: dict[str, Any]) -> Any:
+    async def put(self, url: str, body: dict[str, Any] | list) -> Any:
         r = await self._http.put(url, json=body)
         r.raise_for_status()
         return r.json()
@@ -194,18 +194,33 @@ class SpryngClient:
         )
         return data if isinstance(data, list) else data.get("customfields", data)
 
+    async def get_card_customfields(self, story_id: int) -> list[dict]:
+        """
+        Fetch the full custom-fields array for a card.
+        Returns [{"field": {id, name, ...}, "value": "..."}, ...]
+        """
+        data = await self.get(Config.project_url(f"stories/{story_id}/customfields"))
+        return data if isinstance(data, list) else data.get("customfields", data)
+
     async def set_custom_field(self, card_ref: str, field_id: int, value: str) -> dict:
         """
-        Sets a single custom field on a card.
-        Fetches the card first to preserve existing extra_fields.
+        Sets a single custom field on a card using the dedicated customfields endpoint.
+        Fetches the full array, mutates the matching entry, and PUTs the whole array back.
         """
         story_id = await self._resolve_card_id(card_ref)
-        card = await self.get(Config.project_url(f"stories/{story_id}/"))
-        extra = card.get("extra_fields") or {}
-        extra[str(field_id)] = value
-        return await self.patch(
-            Config.project_url(f"stories/{story_id}/"),
-            {"extra_fields": extra},
+        fields = await self.get_card_customfields(story_id)
+        for entry in fields:
+            if entry.get("field", {}).get("id") == field_id:
+                entry["value"] = value
+                break
+        else:
+            raise ValueError(
+                f"Field id={field_id} not found on card {card_ref!r}. "
+                "Use list_custom_fields() to get valid field ids."
+            )
+        return await self.put(
+            Config.project_url(f"stories/{story_id}/customfields"),
+            fields,
         )
 
     # ── Members ────────────────────────────────────────────────────────────────
