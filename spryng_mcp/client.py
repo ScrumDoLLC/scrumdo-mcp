@@ -143,12 +143,54 @@ class SpryngClient:
         story_id = await self._resolve_card_id(card_ref)
         return await self.get(Config.project_url(f"stories/{story_id}/"))
 
-    async def create_card(self, body: dict[str, Any]) -> dict:
-        return await self.post(Config.project_url("stories/"), body)
+    @staticmethod
+    def _normalize_story_body(body: dict[str, Any]) -> dict[str, Any]:
+        """Map MCP field names to API field names and drop unsupported keys."""
+        body = dict(body)
+        # "description" is the MCP-facing name; the API uses "detail"
+        if "description" in body:
+            body["detail"] = body.pop("description")
+        # "cell" is how create passes the value; the API uses "cell_id"
+        if "cell" in body:
+            body["cell_id"] = body.pop("cell")
+        # "iteration" / "archived" are not processed by the story body handler
+        body.pop("iteration", None)
+        body.pop("archived", None)
+        body.pop("status", None)
+        return body
 
-    async def update_card(self, card_ref: str, body: dict[str, Any]) -> dict:
+    async def create_card(self, body: dict[str, Any], iteration_id: int | None = None) -> dict:
+        body = self._normalize_story_body(body)
+        # POST must go to iterations/{id}/stories/ — iteration_id required
+        iter_id = iteration_id or body.pop("iteration_id", None)
+        if not iter_id:
+            # Fall back to the project's default (backlog) iteration
+            iters = await self.get(Config.project_url("iterations/"))
+            iters = iters if isinstance(iters, list) else iters.get("iterations", [])
+            default = next((i for i in iters if i.get("iteration_type") == 0), None)
+            iter_id = default["id"] if default else iters[0]["id"]
+        return await self.post(Config.project_url(f"iterations/{iter_id}/stories/"), body)
+
+    async def update_card(self, card_ref: str, body: dict[str, Any],
+                          iteration_id: int | None = None) -> dict:
         story_id = await self._resolve_card_id(card_ref)
-        return await self.patch(Config.project_url(f"stories/{story_id}/"), body)
+        body = self._normalize_story_body(body)
+        if iteration_id:
+            url = Config.project_url(f"iterations/{iteration_id}/stories/{story_id}/")
+        else:
+            url = Config.project_url(f"stories/{story_id}/")
+        return await self.put(url, body)
+
+    async def archive_card(self, card_ref: str) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        iters = await self.get(Config.project_url("iterations/"))
+        iters = iters if isinstance(iters, list) else iters.get("iterations", [])
+        archive = next((i for i in iters if i.get("iteration_type") == 2), None)
+        if not archive:
+            raise ValueError("No archive iteration found for this project.")
+        return await self.put(
+            Config.project_url(f"iterations/{archive['id']}/stories/{story_id}/"), {}
+        )
 
     async def delete_card(self, card_ref: str) -> int:
         story_id = await self._resolve_card_id(card_ref)

@@ -111,9 +111,7 @@ def register(mcp: FastMCP) -> None:
         if due_date:
             body["due_date"] = due_date
         if cell_id is not None:
-            body["cell"] = cell_id
-        if iteration_id is not None:
-            body["iteration"] = iteration_id
+            body["cell_id"] = cell_id
         if assignee_ids:
             body["assignees"] = assignee_ids
         if label_ids:
@@ -121,7 +119,7 @@ def register(mcp: FastMCP) -> None:
         if extra_fields:
             body["extra_fields"] = extra_fields
         async with SpryngClient() as c:
-            return await c.create_card(body)
+            return await c.create_card(body, iteration_id=iteration_id)
 
     @mcp.tool()
     async def update_card(
@@ -129,7 +127,6 @@ def register(mcp: FastMCP) -> None:
         summary: str | None = None,
         description: str | None = None,
         points: int | None = None,
-        status: str | None = None,
         due_date: str | None = None,
         iteration_id: int | None = None,
         assignee_ids: list[int] | None = None,
@@ -146,10 +143,9 @@ def register(mcp: FastMCP) -> None:
             summary:       New title.
             description:   New description (markdown).
             points:        New story points.
-            status:        New status string.
             due_date:      Due date in YYYY-MM-DD format. Pass empty string to clear.
             iteration_id:  Move card to this iteration/sprint id. Use list_iterations()
-                           to find ids. Pass 0 to remove from all iterations.
+                           to find ids.
             assignee_ids:  Replace assignee list. Use list_members() to find ids.
             label_ids:     Replace label list.
             extra_fields:  Merge into existing custom fields. Existing keys not
@@ -164,12 +160,8 @@ def register(mcp: FastMCP) -> None:
             body["description"] = description
         if points is not None:
             body["points"] = points
-        if status is not None:
-            body["status"] = status
         if due_date is not None:
             body["due_date"] = due_date or None
-        if iteration_id is not None:
-            body["iteration"] = iteration_id if iteration_id != 0 else None
         if assignee_ids is not None:
             body["assignees"] = assignee_ids
         if label_ids is not None:
@@ -181,7 +173,7 @@ def register(mcp: FastMCP) -> None:
                 existing = dict(card.get("extra_fields") or {})
                 existing.update(extra_fields)
                 body["extra_fields"] = existing
-            return await c.update_card(card_ref, body)
+            return await c.update_card(card_ref, body, iteration_id=iteration_id or None)
 
     @mcp.tool()
     async def move_card(card_ref: str, cell_id: int) -> dict:
@@ -195,7 +187,7 @@ def register(mcp: FastMCP) -> None:
         Returns the updated card.
         """
         async with SpryngClient() as c:
-            return await c.update_card(card_ref, {"cell": cell_id})
+            return await c.update_card(card_ref, {"cell_id": cell_id})
 
     @mcp.tool()
     async def move_card_to_iteration(card_ref: str, iteration_id: int) -> dict:
@@ -205,13 +197,11 @@ def register(mcp: FastMCP) -> None:
         Args:
             card_ref:     Card reference, e.g. 'ON-914'.
             iteration_id: Target iteration id. Use list_iterations() to find ids.
-                          Pass 0 to remove the card from its current iteration.
 
         Returns the updated card.
         """
         async with SpryngClient() as c:
-            body = {"iteration": iteration_id if iteration_id != 0 else None}
-            return await c.update_card(card_ref, body)
+            return await c.update_card(card_ref, {}, iteration_id=iteration_id)
 
     @mcp.tool()
     async def set_card_field(card_ref: str, field_id: int, value: str) -> dict:
@@ -231,13 +221,14 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def archive_card(card_ref: str) -> dict:
         """
-        Archive a card (soft delete — card is hidden but recoverable).
+        Archive a card by moving it to the project's Archive iteration.
+        The card is hidden from the board but recoverable via the archive view.
 
         Args:
             card_ref: Card reference, e.g. 'ON-914'.
         """
         async with SpryngClient() as c:
-            return await c.update_card(card_ref, {"archived": True})
+            return await c.archive_card(card_ref)
 
     @mcp.tool()
     async def assign_card(card_ref: str, assignee_ids: list[int]) -> dict:
