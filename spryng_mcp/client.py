@@ -157,6 +157,16 @@ class SpryngClient:
         body.pop("iteration", None)
         body.pop("archived", None)
         body.pop("status", None)
+        # set_labels() expects [{"id": N}, ...] — wrap bare integers
+        if "labels" in body:
+            raw = body["labels"] or []
+            body["labels"] = [
+                lbl if isinstance(lbl, dict) else {"id": lbl}
+                for lbl in raw
+            ]
+        # story.tags setter expects a comma-separated string, not a list
+        if "tags" in body and isinstance(body["tags"], list):
+            body["tags"] = ",".join(str(t) for t in body["tags"])
         return body
 
     async def create_card(self, body: dict[str, Any], iteration_id: int | None = None) -> dict:
