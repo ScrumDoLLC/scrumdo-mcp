@@ -59,3 +59,23 @@ def register(mcp: FastMCP) -> None:
         async with SpryngClient() as c:
             story_id = await c._resolve_card_id(card_ref)
             return await c.get_card_customfields(story_id)
+
+    @mcp.tool()
+    async def set_card_fields(card_ref: str, fields: dict) -> dict:
+        """
+        Set multiple custom fields on a card in a single request.
+
+        Prefer this over calling set_card_field() repeatedly — it does one
+        GET and one PUT regardless of how many fields you're updating.
+
+        Args:
+            card_ref: Card reference, e.g. 'ON-914'.
+            fields:   Mapping of field_id (int) → value (str) for every field
+                      you want to set, e.g. {"5303": "...", "5304": "..."}.
+                      Keys may be ints or strings — both are accepted.
+
+        Returns the updated custom fields array.
+        """
+        normalised = {int(k): v for k, v in fields.items()}
+        async with SpryngClient() as c:
+            return await c.set_custom_fields(card_ref, normalised)

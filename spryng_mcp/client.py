@@ -259,15 +259,26 @@ class SpryngClient:
         Sets a single custom field on a card using the dedicated customfields endpoint.
         Fetches the full array, mutates the matching entry, and PUTs the whole array back.
         """
+        return await self.set_custom_fields(card_ref, {field_id: value})
+
+    async def set_custom_fields(self, card_ref: str, updates: dict[int, str]) -> dict:
+        """
+        Sets multiple custom fields in a single GET + PUT round-trip.
+
+        Args:
+            card_ref: Card reference, e.g. 'ON-914'.
+            updates:  Mapping of {field_id: value} for all fields to set.
+        """
         story_id = await self._resolve_card_id(card_ref)
         fields = await self.get_card_customfields(story_id)
+        remaining = dict(updates)
         for entry in fields:
-            if entry.get("field", {}).get("id") == field_id:
-                entry["value"] = value
-                break
-        else:
+            fid = entry.get("field", {}).get("id")
+            if fid in remaining:
+                entry["value"] = remaining.pop(fid)
+        if remaining:
             raise ValueError(
-                f"Field id={field_id} not found on card {card_ref!r}. "
+                f"Field id(s) {list(remaining)} not found on card {card_ref!r}. "
                 "Use list_custom_fields() to get valid field ids."
             )
         return await self.put(
