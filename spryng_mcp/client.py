@@ -157,6 +157,11 @@ class SpryngClient:
         body.pop("iteration", None)
         body.pop("archived", None)
         body.pop("status", None)
+        # "milestone_id" is the MCP-facing name; the API uses {"release": {"id": N}}
+        # Pass milestone_id=0 or milestone_id=None to clear the milestone.
+        if "milestone_id" in body:
+            mid = body.pop("milestone_id")
+            body["release"] = {"id": mid} if mid else None
         # set_labels() expects [{"id": N}, ...] — wrap bare integers
         if "labels" in body:
             raw = body["labels"] or []
@@ -321,6 +326,18 @@ class SpryngClient:
     async def list_epics(self) -> list[dict]:
         data = await self.get(Config.project_url("epics/"))
         return data if isinstance(data, list) else data.get("epics", data)
+
+    # ── Milestones (releases) ──────────────────────────────────────────────────
+
+    async def list_milestones(self, project_slug: str | None = None) -> list[dict]:
+        """
+        List milestones (called 'releases' in the API) for a project.
+        These are portfolio-level stories that team cards can be assigned to.
+        GET organizations/{org}/releases/{project_slug}/
+        """
+        slug = project_slug or Config.project
+        data = await self.get(Config.org_url(f"releases/{slug}/"))
+        return data if isinstance(data, list) else data.get("releases", data)
 
     # ── Labels ─────────────────────────────────────────────────────────────────
 

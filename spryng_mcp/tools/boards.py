@@ -90,6 +90,28 @@ def register(mcp: FastMCP) -> None:
             return await c.list_epics()
 
     @mcp.tool()
+    async def list_milestones(project_slug: str | None = None) -> list[dict]:
+        """
+        List all milestones for a project.
+
+        In ScrumDo, milestones are called 'releases' — they are portfolio-level
+        stories that team cards can be assigned to, used to track work toward a
+        delivery target. Cards show which milestone they belong to via the
+        'release' field returned by get_card().
+
+        Use the numeric id from this list with:
+          - create_card(milestone_id=...)
+          - update_card(card_ref, milestone_id=...)   pass 0 to clear
+
+        Args:
+            project_slug: Board slug. Defaults to the configured project.
+                          For team boards, pass the parent portfolio slug to
+                          see milestones defined at the portfolio level.
+        """
+        async with SpryngClient() as c:
+            return await c.list_milestones(project_slug)
+
+    @mcp.tool()
     async def card_schema() -> dict:
         """
         Return a complete guide to every field that can be set on a card or task.
@@ -180,6 +202,15 @@ def register(mcp: FastMCP) -> None:
                         "description": (
                             "Board column to place the card in (create) or move to (update). "
                             "See 'cells' key in this response for valid ids."
+                        ),
+                    },
+                    {
+                        "field": "milestone_id",
+                        "type": "integer",
+                        "required": False,
+                        "description": (
+                            "Milestone (release) to assign this card to. "
+                            "Use list_milestones() to find ids. Pass 0 to clear."
                         ),
                     },
                 ],

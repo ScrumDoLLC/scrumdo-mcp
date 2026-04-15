@@ -83,8 +83,10 @@ def register(mcp: FastMCP) -> None:
         due_date: str | None = None,
         cell_id: int | None = None,
         iteration_id: int | None = None,
+        milestone_id: int | None = None,
         assignee_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
+        tags: str | None = None,
         extra_fields: dict[str, str] | None = None,
     ) -> dict:
         """
@@ -97,8 +99,11 @@ def register(mcp: FastMCP) -> None:
             due_date:      Due date in YYYY-MM-DD format.
             cell_id:       Board column to place the card in.
             iteration_id:  Iteration/sprint to assign the card to.
+            milestone_id:  Milestone (release) id to attach the card to.
+                           Use list_milestones() to find ids.
             assignee_ids:  List of user IDs to assign. Use list_members() to find ids.
-            label_ids:     List of label IDs to attach.
+            label_ids:     List of label IDs to attach. Use list_labels() to find ids.
+            tags:          Comma-separated tags, e.g. "backend,qa".
             extra_fields:  Custom field values as {field_id: value} dict.
 
         Returns the full created card object including its assigned reference (e.g. 'ON-915').
@@ -112,10 +117,14 @@ def register(mcp: FastMCP) -> None:
             body["due_date"] = due_date
         if cell_id is not None:
             body["cell_id"] = cell_id
+        if milestone_id is not None:
+            body["milestone_id"] = milestone_id
         if assignee_ids:
             body["assignees"] = assignee_ids
         if label_ids:
             body["labels"] = label_ids
+        if tags is not None:
+            body["tags"] = tags
         if extra_fields:
             body["extra_fields"] = extra_fields
         async with SpryngClient() as c:
@@ -129,6 +138,7 @@ def register(mcp: FastMCP) -> None:
         points: int | None = None,
         due_date: str | None = None,
         iteration_id: int | None = None,
+        milestone_id: int | None = None,
         assignee_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
         tags: str | None = None,
@@ -147,6 +157,8 @@ def register(mcp: FastMCP) -> None:
             due_date:      Due date in YYYY-MM-DD format. Pass empty string to clear.
             iteration_id:  Move card to this iteration/sprint id. Use list_iterations()
                            to find ids.
+            milestone_id:  Assign to a milestone (release). Use list_milestones() to
+                           find ids. Pass 0 to remove the milestone assignment.
             assignee_ids:  Replace assignee list. Use list_members() to find ids.
             label_ids:     Replace label list with these label ids. Use list_labels()
                            to discover ids. Pass [] to clear all labels.
@@ -167,6 +179,8 @@ def register(mcp: FastMCP) -> None:
             body["points"] = points
         if due_date is not None:
             body["due_date"] = due_date or None
+        if milestone_id is not None:
+            body["milestone_id"] = milestone_id
         if assignee_ids is not None:
             body["assignees"] = assignee_ids
         if label_ids is not None:
