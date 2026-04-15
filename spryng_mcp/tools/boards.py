@@ -66,6 +66,10 @@ def register(mcp: FastMCP) -> None:
         """
         List all labels defined in the project.
 
+        Returns each label's id, name, and color. Use the numeric id with
+        add_card_label(), remove_card_label(), or update_card(label_ids=[...]).
+        To see which labels are currently on a card, use get_card().
+
         Args:
             project_slug: Board slug. Defaults to the configured project.
         """

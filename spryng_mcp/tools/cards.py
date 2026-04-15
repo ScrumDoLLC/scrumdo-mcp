@@ -131,6 +131,7 @@ def register(mcp: FastMCP) -> None:
         iteration_id: int | None = None,
         assignee_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
+        tags: str | None = None,
         extra_fields: dict[str, str] | None = None,
     ) -> dict:
         """
@@ -147,8 +148,12 @@ def register(mcp: FastMCP) -> None:
             iteration_id:  Move card to this iteration/sprint id. Use list_iterations()
                            to find ids.
             assignee_ids:  Replace assignee list. Use list_members() to find ids.
-            label_ids:     Replace label list.
-            extra_fields:  Merge into existing custom fields. Existing keys not
+            label_ids:     Replace label list with these label ids. Use list_labels()
+                           to discover ids. Pass [] to clear all labels.
+            tags:          Comma-separated tag string, e.g. "backend,qa,blocked".
+                           Replaces the existing tag list. Pass "" to clear all tags.
+            extra_fields:  Merge into existing custom fields as {field_id: value}.
+                           Use list_custom_fields() to find ids. Existing keys not
                            mentioned here will be preserved.
 
         Returns the full updated card object.
@@ -166,6 +171,8 @@ def register(mcp: FastMCP) -> None:
             body["assignees"] = assignee_ids
         if label_ids is not None:
             body["labels"] = label_ids
+        if tags is not None:
+            body["tags"] = tags
 
         async with SpryngClient() as c:
             if extra_fields:
