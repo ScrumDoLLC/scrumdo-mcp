@@ -81,7 +81,12 @@ async def test_get_card_returns_card():
 @respx.mock
 @pytest.mark.asyncio
 async def test_create_card_posts_body():
-    respx.post(Config.project_url("stories/")).mock(
+    # create_card resolves the default (backlog) iteration, then POSTs to
+    # iterations/{id}/stories/.
+    respx.get(Config.project_url("iterations/")).mock(
+        return_value=Response(200, json=[{"id": 5, "iteration_type": 0}])
+    )
+    respx.post(Config.project_url("iterations/5/stories/")).mock(
         return_value=Response(201, json={**CARD_STUB, "number": 915, "local_id": "ON-915"})
     )
     async with SpryngClient() as c:
@@ -93,7 +98,7 @@ async def test_create_card_posts_body():
 @pytest.mark.asyncio
 async def test_update_card_patches():
     _mock_card_resolution()
-    respx.patch(Config.project_url(f"stories/{CARD_ID}/")).mock(
+    respx.put(Config.project_url(f"stories/{CARD_ID}/")).mock(
         return_value=Response(200, json={**CARD_STUB, "summary": "Updated"})
     )
     async with SpryngClient() as c:
@@ -117,7 +122,7 @@ async def test_list_tasks():
 @respx.mock
 @pytest.mark.asyncio
 async def test_add_comment():
-    respx.post(Config.api("comments/story/")).mock(
+    respx.post(Config.org_url(f"comments/story/{CARD_ID}/")).mock(
         return_value=Response(201, json={"id": 100, "comment": "Hello", "author": "bot"})
     )
     async with SpryngClient() as c:
@@ -128,20 +133,25 @@ async def test_add_comment():
 @respx.mock
 @pytest.mark.asyncio
 async def test_set_custom_field_preserves_existing():
-    """set_custom_field should merge new value into existing extra_fields."""
-    existing = {**CARD_STUB, "extra_fields": {"5303": "existing-value", "5433": "old-pr"}}
+    """set_custom_field GETs the customfields array, updates the matching entry,
+    and PUTs the whole array back — leaving the other fields untouched."""
+    cf_array = [
+        {"field": {"id": 5303}, "value": "existing-value"},
+        {"field": {"id": 5433}, "value": "old-pr"},
+    ]
     _mock_card_resolution()
-    respx.get(Config.project_url(f"stories/{CARD_ID}/")).mock(
-        return_value=Response(200, json=existing)
+    respx.get(Config.project_url(f"stories/{CARD_ID}/customfields")).mock(
+        return_value=Response(200, json=cf_array)
     )
-    patch_req = respx.patch(Config.project_url(f"stories/{CARD_ID}/")).mock(
-        return_value=Response(200, json=existing)
+    put_req = respx.put(Config.project_url(f"stories/{CARD_ID}/customfields")).mock(
+        return_value=Response(200, json=cf_array)
     )
     async with SpryngClient() as c:
         await c.set_custom_field("ON-914", 5433, "new-pr-url")
-    sent = json.loads(patch_req.calls[0].request.content)
-    assert sent["extra_fields"]["5303"] == "existing-value"  # preserved
-    assert sent["extra_fields"]["5433"] == "new-pr-url"       # updated
+    sent = json.loads(put_req.calls[0].request.content)
+    by_id = {e["field"]["id"]: e["value"] for e in sent}
+    assert by_id[5303] == "existing-value"  # preserved
+    assert by_id[5433] == "new-pr-url"       # updated
 
 
 @respx.mock
@@ -231,7 +241,7 @@ async def test_get_activity_log_filters_by_agent():
     respx.get(Config.project_url(f"stories/{CARD_ID}/")).mock(
         return_value=Response(200, json=CARD_STUB)
     )
-    respx.get(Config.api("comments/story/")).mock(
+    respx.get(Config.org_url(f"comments/story/{CARD_ID}/")).mock(
         return_value=Response(200, json=comments)
     )
 

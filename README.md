@@ -123,15 +123,16 @@ Once connected, just talk to your AI tool naturally:
 
 ---
 
-## Available tools (83 total)
+## Available tools (87 total)
 
 | Group | Tools |
 |-------|-------|
-| **Boards** | `list_boards`, `get_board`, `get_board_cells`, `list_iterations`, `list_labels`, `list_epics` |
-| **Cards** | `list_cards`, `get_card`, `find_card`, `create_card`, `update_card`, `move_card`, `move_card_to_iteration`, `set_card_field`, `archive_card`, `assign_card`, `add_card_label`, `remove_card_label` |
+| **Boards** | `list_boards`, `get_board`, `get_board_cells`, `list_iterations`, `list_milestones`, `list_labels`, `list_epics` |
+| **Cards** | `list_cards`, `get_card`, `card_schema`, `find_card`, `create_card`, `update_card`, `move_card`, `move_card_to_iteration`, `set_card_field`, `set_card_fields`, `archive_card`, `assign_card`, `add_card_label`, `remove_card_label` |
 | **Blockers** | `list_blockers`, `block_card`, `unblock_card` |
 | **Tasks** | `list_tasks`, `create_task`, `complete_task`, `reopen_task`, `update_task`, `delete_task` |
 | **Comments** | `list_comments`, `add_comment`, `delete_comment` |
+| **Attachments** | `add_attachment` |
 | **Fields** | `list_custom_fields`, `get_card_field`, `get_all_card_fields` |
 | **Members** | `list_members`, `find_member` |
 | **Search** | `search_cards`, `search_by_field_value` |
