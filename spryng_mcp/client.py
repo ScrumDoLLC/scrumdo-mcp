@@ -177,6 +177,21 @@ class SpryngClient:
         body.pop("iteration", None)
         body.pop("archived", None)
         body.pop("status", None)
+        # "milestone_id" is the MCP-facing name; the API uses {"release": {"id": N}}
+        # Pass milestone_id=0 or milestone_id=None to clear the milestone.
+        if "milestone_id" in body:
+            mid = body.pop("milestone_id")
+            body["release"] = {"id": mid} if mid else None
+        # set_labels() expects [{"id": N}, ...] — wrap bare integers
+        if "labels" in body:
+            raw = body["labels"] or []
+            body["labels"] = [
+                lbl if isinstance(lbl, dict) else {"id": lbl}
+                for lbl in raw
+            ]
+        # story.tags setter expects a comma-separated string, not a list
+        if "tags" in body and isinstance(body["tags"], list):
+            body["tags"] = ",".join(str(t) for t in body["tags"])
         return body
 
     async def create_card(self, body: dict[str, Any], iteration_id: int | None = None) -> dict:
@@ -238,14 +253,16 @@ class SpryngClient:
     # ── Comments ───────────────────────────────────────────────────────────────
 
     async def list_comments(self, card_id: int) -> list[dict]:
-        data = await self.get(Config.api(f"comments/story/{card_id}/"))
+        # Use org-scoped URL — top-level /api/scrumdo/comments/... is blocked for
+        # OrgAPIKey / Bearer tokens whose auth is path-restricted to organizations/{org}/
+        data = await self.get(Config.org_url(f"comments/story/{card_id}/"))
         return data if isinstance(data, list) else data.get("comments", data)
 
     async def add_comment(self, card_id: int, body: str) -> dict:
-        return await self.post(Config.api(f"comments/story/{card_id}/"), {"comment": body})
+        return await self.post(Config.org_url(f"comments/story/{card_id}/"), {"comment": body})
 
     async def delete_comment(self, story_id: int, comment_id: int) -> int:
-        return await self.delete(Config.api(f"comments/story/{story_id}/comment/{comment_id}/"))
+        return await self.delete(Config.org_url(f"comments/story/{story_id}/comment/{comment_id}/"))
 
     # ── Custom fields ──────────────────────────────────────────────────────────
 
@@ -269,15 +286,26 @@ class SpryngClient:
         Sets a single custom field on a card using the dedicated customfields endpoint.
         Fetches the full array, mutates the matching entry, and PUTs the whole array back.
         """
+        return await self.set_custom_fields(card_ref, {field_id: value})
+
+    async def set_custom_fields(self, card_ref: str, updates: dict[int, str]) -> dict:
+        """
+        Sets multiple custom fields in a single GET + PUT round-trip.
+
+        Args:
+            card_ref: Card reference, e.g. 'ON-914'.
+            updates:  Mapping of {field_id: value} for all fields to set.
+        """
         story_id = await self._resolve_card_id(card_ref)
         fields = await self.get_card_customfields(story_id)
+        remaining = dict(updates)
         for entry in fields:
-            if entry.get("field", {}).get("id") == field_id:
-                entry["value"] = value
-                break
-        else:
+            fid = entry.get("field", {}).get("id")
+            if fid in remaining:
+                entry["value"] = remaining.pop(fid)
+        if remaining:
             raise ValueError(
-                f"Field id={field_id} not found on card {card_ref!r}. "
+                f"Field id(s) {list(remaining)} not found on card {card_ref!r}. "
                 "Use list_custom_fields() to get valid field ids."
             )
         return await self.put(
@@ -321,6 +349,18 @@ class SpryngClient:
         data = await self.get(Config.project_url("epics/"))
         return data if isinstance(data, list) else data.get("epics", data)
 
+    # ── Milestones (releases) ──────────────────────────────────────────────────
+
+    async def list_milestones(self, project_slug: str | None = None) -> list[dict]:
+        """
+        List milestones (called 'releases' in the API) for a project.
+        These are portfolio-level stories that team cards can be assigned to.
+        GET organizations/{org}/releases/{project_slug}/
+        """
+        slug = project_slug or Config.project
+        data = await self.get(Config.org_url(f"releases/{slug}/"))
+        return data if isinstance(data, list) else data.get("releases", data)
+
     # ── Labels ─────────────────────────────────────────────────────────────────
 
     async def list_labels(self) -> list[dict]:
@@ -362,3 +402,91 @@ class SpryngClient:
     async def log_time(self, card_ref: str, body: dict[str, Any]) -> dict:
         story_id = await self._resolve_card_id(card_ref)
         return await self.post(Config.project_url(f"stories/{story_id}/time_entries/"), body)
+
+    # ── Attachments (write-only) ───────────────────────────────────────────────
+    #
+    # This client deliberately exposes upload only. No list/get/download
+    # methods are provided. The MCP tool layer mirrors this restriction.
+
+    async def add_attachment(
+        self,
+        card_ref: str,
+        *,
+        file_path: str | None = None,
+        file_url: str | None = None,
+        file_name: str | None = None,
+        thumb_url: str | None = None,
+    ) -> dict:
+        """
+        Upload a file or register an external URL as an attachment on a card.
+
+        Exactly one of ``file_path`` or ``file_url`` must be provided.
+
+        - ``file_path``: absolute path to a local file. The file is read and
+          POSTed as multipart/form-data in the ``attachment_file`` field.
+          ``file_name`` defaults to the basename of ``file_path``.
+
+        - ``file_url``: an externally hosted URL. The attachment is recorded
+          with ``attchmentType='external'``; ``file_name`` is required.
+
+        Returns the created attachment object as returned by the API.
+        """
+        # ── Validate args BEFORE any I/O so error paths are cheap ────────
+        if (file_path is None) == (file_url is None):
+            raise ValueError(
+                "Provide exactly one of file_path or file_url."
+            )
+
+        from pathlib import Path
+
+        file_bytes: bytes | None = None
+        display_name: str
+        if file_path is not None:
+            path = Path(file_path)
+            if not path.is_file():
+                raise FileNotFoundError(f"No such file: {file_path}")
+            display_name = file_name or path.name
+            file_bytes = path.read_bytes()
+        else:
+            if not file_name:
+                raise ValueError(
+                    "file_name is required when file_url is provided."
+                )
+            display_name = file_name
+
+        # ── Network I/O ───────────────────────────────────────────────────
+        story_id = await self._resolve_card_id(card_ref)
+        url = Config.project_url(f"stories/{story_id}/attachments/")
+        # The story-attachment endpoint expects multipart/form-data, which
+        # conflicts with this client's default application/json header. Use a
+        # one-shot httpx call with only the Authorization header so httpx
+        # picks the correct Content-Type with multipart boundary itself.
+        auth_header = {"Authorization": f"Bearer {Config.token}"}
+        data: dict[str, str]
+        files: dict[str, tuple[str, bytes]]
+
+        if file_bytes is not None:
+            data = {
+                "fileName": display_name,
+                "attchmentType": "local",
+            }
+            files = {"attachment_file": (display_name, file_bytes)}
+        else:
+            data = {
+                "attachmentUrl": file_url or "",
+                "fileName": display_name,
+                "attchmentType": "external",
+            }
+            # Force multipart even in URL mode by adding an empty marker
+            # file part. httpx defaults to application/x-www-form-urlencoded
+            # when files is absent, which percent-encodes URLs and breaks
+            # downstream inspection. Multipart keeps the raw URL readable.
+            files = {"_marker": ("", b"")}
+
+        if thumb_url:
+            data["thumbUrl"] = thumb_url
+
+        async with httpx.AsyncClient(timeout=60.0) as http:
+            r = await http.post(url, headers=auth_header, data=data, files=files)
+        r.raise_for_status()
+        return r.json()

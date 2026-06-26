@@ -247,3 +247,141 @@ async def test_get_activity_log_filters_by_agent():
     assert len(result) == 1
     assert result[0]["agent"] == "claude-code"
     assert result[0]["action"] == "start"
+
+
+# ── Attachments: write-only contract ───────────────────────────────────────────
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_add_attachment_uploads_local_file(tmp_path):
+    """A local-file upload POSTs to the attachments endpoint with the file."""
+    payload = tmp_path / "evidence.txt"
+    payload.write_text("hello attachment")
+
+    _mock_card_resolution()
+    upload_route = respx.post(
+        Config.project_url(f"stories/{CARD_ID}/attachments/")
+    ).mock(
+        return_value=Response(200, json={
+            "attachment": {"id": 42, "file_name": "evidence.txt"}
+        })
+    )
+
+    async with SpryngClient() as c:
+        result = await c.add_attachment("ON-914", file_path=str(payload))
+
+    assert upload_route.called
+    request = upload_route.calls[0].request
+    # Multipart form, not application/json
+    content_type = request.headers["content-type"]
+    assert content_type.startswith("multipart/form-data")
+    body = request.content
+    assert b"attachment_file" in body
+    assert b"evidence.txt" in body
+    assert b"hello attachment" in body
+    assert b"attchmentType" in body  # API field name preserves the typo
+    assert b"local" in body
+    assert result == {"attachment": {"id": 42, "file_name": "evidence.txt"}}
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_add_attachment_registers_external_url():
+    """A URL-only attachment posts attachmentUrl + fileName + external type."""
+    _mock_card_resolution()
+    upload_route = respx.post(
+        Config.project_url(f"stories/{CARD_ID}/attachments/")
+    ).mock(return_value=Response(200, json={"attachment": {"id": 43}}))
+
+    async with SpryngClient() as c:
+        result = await c.add_attachment(
+            "ON-914",
+            file_url="https://example.com/report.pdf",
+            file_name="report.pdf",
+        )
+
+    assert upload_route.called
+    body = upload_route.calls[0].request.content
+    assert b"attachmentUrl" in body
+    assert b"https://example.com/report.pdf" in body
+    assert b"fileName" in body
+    assert b"report.pdf" in body
+    assert b"external" in body
+    # Critically: no file bytes are sent
+    assert b"attachment_file" not in body
+    assert result == {"attachment": {"id": 43}}
+
+
+@pytest.mark.asyncio
+async def test_add_attachment_requires_exactly_one_source():
+    """Neither-or-both file_path/file_url must raise."""
+    async with SpryngClient() as c:
+        with pytest.raises(ValueError, match="exactly one"):
+            await c.add_attachment("ON-914")
+        with pytest.raises(ValueError, match="exactly one"):
+            await c.add_attachment(
+                "ON-914",
+                file_path="/tmp/x",
+                file_url="https://example.com/x",
+            )
+
+
+@pytest.mark.asyncio
+async def test_add_attachment_url_mode_requires_file_name():
+    async with SpryngClient() as c:
+        with pytest.raises(ValueError, match="file_name is required"):
+            await c.add_attachment("ON-914", file_url="https://example.com/x")
+
+
+@pytest.mark.asyncio
+async def test_add_attachment_local_mode_rejects_missing_file():
+    async with SpryngClient() as c:
+        with pytest.raises(FileNotFoundError):
+            await c.add_attachment(
+                "ON-914", file_path="/nonexistent/path/to/file.txt"
+            )
+
+
+def test_attachments_tool_registers_only_add_attachment():
+    """
+    Write-only contract: the attachments module must register exactly one
+    tool, and it must be add_attachment. No list/get/download tools are
+    allowed.
+    """
+    from spryng_mcp.tools.attachments import register
+    from mcp.server.fastmcp import FastMCP
+
+    test_mcp = FastMCP("attachments-contract")
+    register(test_mcp)
+
+    tool_names = {t.name for t in test_mcp._tool_manager._tools.values()}
+    assert tool_names == {"add_attachment"}, (
+        f"Attachments module must expose only add_attachment, got: {tool_names}"
+    )
+
+    forbidden = {
+        "list_attachments", "get_attachments", "get_attachment",
+        "download_attachment", "read_attachment", "fetch_attachment",
+    }
+    assert tool_names.isdisjoint(forbidden), (
+        f"Forbidden read/download tools registered: {tool_names & forbidden}"
+    )
+
+
+def test_client_exposes_no_attachment_read_methods():
+    """
+    The client must not expose attachment read/list/download helpers.
+    add_attachment is the only attachment-related public method.
+    """
+    forbidden = {
+        "list_attachments", "get_attachments", "get_attachment",
+        "download_attachment", "read_attachment", "fetch_attachment",
+    }
+    public = {
+        name for name in dir(SpryngClient)
+        if not name.startswith("_") and "attachment" in name.lower()
+    }
+    assert public == {"add_attachment"}, (
+        f"Client must only expose add_attachment for attachments, got: {public}"
+    )
+    assert public.isdisjoint(forbidden)

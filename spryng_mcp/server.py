@@ -28,6 +28,7 @@ from .tools import (
     activity,
     agent_runs,
     agents,
+    attachments,
     blockers,
     boards,
     cards,
@@ -64,6 +65,8 @@ This MCP server gives you full Monday.com-level access to the board:
   • Write and query structured activity log entries (log_activity / get_activity_log)
   • Search cards by text or custom field value
   • Manage webhooks, time tracking, custom fields, members, labels, and iterations
+  • Upload attachments to cards via add_attachment (WRITE ONLY; this MCP
+    cannot list, read, or download attachments)
 
 Key conventions for this project:
   - Card references are in the format ON-<number>, e.g. ON-914
@@ -119,6 +122,7 @@ fields.register(mcp)
 members.register(mcp)
 search.register(mcp)
 activity.register(mcp)
+attachments.register(mcp)
 webhooks.register(mcp)
 time_tracking.register(mcp)
 # Phase A (BOARD_AI_AGENTS_UNIFIED_SPEC §A.5) — agent identity tools.
