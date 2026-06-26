@@ -31,6 +31,19 @@ class Config:
     org: str = _env("SCRUMDO_ORG", "SPRYNG_ORG", default="")
     project: str = _env("SCRUMDO_PROJECT", "SPRYNG_PROJECT", default="")
 
+    # Phase 0 (BOARD_AI_AGENTS_UNIFIED_SPEC §13.2) — run-context header.
+    # When the connecting agent has been issued an AgentRunToken, this id
+    # MUST be set; every outbound request will carry the
+    # `X-Spryng-Agent-Run` header so audit-log destinations can attribute
+    # writes to a specific AgentRun.
+    agent_run_id: str = _env("SPRYNG_AGENT_RUN_ID", "SCRUMDO_AGENT_RUN_ID",
+                             default="")
+
+    # GOVERNED_AGENT_LOOPS_SPEC §4 — loop correlation header. When an agent is
+    # operating inside a governed loop, set this so every outbound write carries
+    # `X-Spryng-Loop` and can be grouped into the loop's timeline.
+    loop_id: str = _env("SPRYNG_LOOP_ID", "SCRUMDO_LOOP_ID", default="")
+
     @classmethod
     def validate(cls) -> None:
         if not cls.token:

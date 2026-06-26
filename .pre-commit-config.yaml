@@ -1,0 +1,14 @@
+# Pre-commit hooks for the scrumdo-mcp repo.
+# Install:  pip install pre-commit && pre-commit install
+
+repos:
+  - repo: local
+    hooks:
+      - id: check-exact-pins
+        name: Enforce exact-pin SDK manifest (Q-X2)
+        # Re-use the MassSense script so policy stays single-sourced.
+        # Adjust the path if scrumdo-mcp is checked out independently.
+        entry: python3 ../MassSense/scripts/check_exact_pins.py
+        language: system
+        files: ^(pyproject\.toml|requirements\.txt)$
+        pass_filenames: true

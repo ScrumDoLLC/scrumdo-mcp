@@ -123,7 +123,7 @@ Once connected, just talk to your AI tool naturally:
 
 ---
 
-## Available tools (45 total)
+## Available tools (83 total)
 
 | Group | Tools |
 |-------|-------|
@@ -138,6 +138,19 @@ Once connected, just talk to your AI tool naturally:
 | **Activity** | `log_activity`, `get_activity_log`, `get_workspace_activity` |
 | **Webhooks** | `list_webhooks`, `create_webhook`, `delete_webhook` |
 | **Time** | `list_time_entries`, `log_time` |
+| **Spec** | `get_card_spec`, `set_card_spec`, `patch_card_spec`, `get_spec_history` |
+| **GitHub** | `get_github_repos`, `list_card_github_links`, `link_github_pr`, `link_github_commit`, `link_github_issue` |
+| **Agents** | `get_agent_identity`, `list_agent_accounts` |
+| **Agent runs** | `start_agent_run`, `get_agent_run`, `list_agent_runs`, `approve_agent_plan`, `report_agent_progress`, `cancel_agent_run` |
+| **Loops & verification** | `start_loop`, `start_verification_loop`, `get_loop_status`, `list_active_loops`, `pause_loop`, `resume_loop`, `cancel_loop`, `get_loop_state`, `update_loop_state`, `get_verification_status`, `run_verifier`, `verify_card`, `log_loop_step`, `attach_evidence`, `route_to_agent`, `list_skills`, `load_skill` |
+| **Intelligence** | `get_velocity_forecast`, `get_spec_complexity`, `check_spec_drift`, `verify_behavior_contract` |
+
+For a governed verification loop, an orchestrator agent calls `start_verification_loop`
+(by `VerificationProfile` slug or inline `proof_requirements`/`verifier_agent`), the
+Maker (Grok/Codex) implements and calls `run_verifier` against the accepted spec
+(never self-verifies), and `log_loop_step` / `attach_evidence` write the audit trail
+to the card. When an agent runs **inside** a loop (`SPRYNG_LOOP_ID` set), the loop-scoped
+tools default to that loop, so `loop_id` is optional.
 
 ---
 
@@ -145,10 +158,12 @@ Once connected, just talk to your AI tool naturally:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SCRUMDO_TOKEN` | — | **Required.** API token from Settings → API Tokens |
+| `SCRUMDO_TOKEN` | — | **Required.** API token from Settings → API Tokens (or an agent's token, for AI Agent runs) |
 | `SCRUMDO_BASE_URL` | `https://app.spryng.io` | API base URL |
 | `SCRUMDO_ORG` | — | Your organization slug |
 | `SCRUMDO_PROJECT` | — | Default project slug |
+| `SCRUMDO_AGENT_RUN_ID` | — | Optional. AI Agent run id this MCP is driving. When set, every write sends the `X-Spryng-Agent-Run` header so the run's audit trail attributes the write (`change_source='agent_run'`). Requires `SCRUMDO_TOKEN` to be that agent's own token, and the run to belong to it. |
+| `SPRYNG_LOOP_ID` | — | Optional. The governed loop this MCP is running inside. When set, writes carry the `X-Spryng-Loop` header (attributed to the loop's timeline) and the loop-scoped tools (`log_loop_step`, `attach_evidence`, `get_verification_status`) default their `loop_id` to it — so in-loop agents call them without an id. (`SCRUMDO_LOOP_ID` is accepted as an alias.) |
 
 ---
 
