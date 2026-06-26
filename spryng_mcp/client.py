@@ -16,17 +16,37 @@ class SpryngClient:
     The caller (tool layer) is responsible for presenting errors to the LLM.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, agent_run_id: str | None = None,
+                 loop_id: str | None = None) -> None:
+        # Per BOARD_AI_AGENTS_UNIFIED_SPEC §13.2 — propagate the active
+        # AgentRun id on every outbound request when the token is run-scoped.
+        # Explicit ctor arg wins; otherwise fall back to Config.agent_run_id.
+        run_id = (agent_run_id or Config.agent_run_id or "").strip()
+        # GOVERNED_AGENT_LOOPS_SPEC §4 — loop correlation header.
+        lp_id = (loop_id or Config.loop_id or "").strip()
+
+        headers: dict[str, str] = {
+            "Authorization": f"Bearer {Config.token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if run_id:
+            headers["X-Spryng-Agent-Run"] = run_id
+        if lp_id:
+            headers["X-Spryng-Loop"] = lp_id
+
         self._http = httpx.AsyncClient(
-            headers={
-                "Authorization": f"Bearer {Config.token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
+            headers=headers,
             timeout=30.0,
         )
+        self._agent_run_id: str = run_id
         # Cache: human-readable card ref (e.g. "ON-914") → numeric story id
         self._card_id_cache: dict[str, int] = {}
+
+    @property
+    def agent_run_id(self) -> str:
+        """The active AgentRun id propagated on every write, if any."""
+        return self._agent_run_id
 
     async def __aenter__(self) -> "SpryngClient":
         return self
