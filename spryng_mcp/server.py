@@ -40,6 +40,7 @@ from .tools import (
     members,
     search,
     spec,
+    spec_proposals,
     tasks,
     time_tracking,
     webhooks,
@@ -80,6 +81,18 @@ Key conventions for this project:
 
 Use log_activity() to record agent actions against cards so the workspace
 activity log stays current and filterable.
+
+Spec proposals — the reviewed alternative to editing the spec directly:
+  generate_spec_proposal / list_spec_proposals / accept_spec_proposal /
+  reject_spec_proposal / request_spec_proposal_changes / revise_spec_proposal.
+  ALL SIX are human-only — the backend rejects an agent-flagged caller with
+  403 on every one of them, including generate (an agent drafts when
+  dispatched by a human's generate call; it never self-triggers drafting).
+  If you are an autonomous agent, do not call these — use get_card_spec /
+  set_card_spec / patch_card_spec instead, which are the agent-writable path
+  (subject to the frontmatter whitelist in step 3 below). accept_spec_proposal
+  can trigger an execution run if the room has a runnable profile — it is a
+  real "make this official" action, not a passive review note.
 
 If you are running as an AI agent (BOARD_AI_AGENTS_UNIFIED_SPEC §13.4):
   1. Call get_agent_identity() first; capture current_run_id.
@@ -129,6 +142,8 @@ time_tracking.register(mcp)
 agents.register(mcp)
 # Phase B (BOARD_AI_AGENTS_UNIFIED_SPEC §5.6) — card spec tools.
 spec.register(mcp)
+# Spec proposal lifecycle: generate/list/accept/reject/request-changes/revise.
+spec_proposals.register(mcp)
 # Phase D (BOARD_AI_AGENTS_UNIFIED_SPEC §D.4) — GitHub link tools.
 github.register(mcp)
 # Phase E (BOARD_AI_AGENTS_UNIFIED_SPEC §E.7) — AgentRun lifecycle tools.

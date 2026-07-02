@@ -123,7 +123,7 @@ Once connected, just talk to your AI tool naturally:
 
 ---
 
-## Available tools (87 total)
+## Available tools (93 total)
 
 | Group | Tools |
 |-------|-------|
@@ -140,6 +140,7 @@ Once connected, just talk to your AI tool naturally:
 | **Webhooks** | `list_webhooks`, `create_webhook`, `delete_webhook` |
 | **Time** | `list_time_entries`, `log_time` |
 | **Spec** | `get_card_spec`, `set_card_spec`, `patch_card_spec`, `get_spec_history` |
+| **Spec proposals** | `generate_spec_proposal`, `list_spec_proposals`, `accept_spec_proposal`, `reject_spec_proposal`, `request_spec_proposal_changes`, `revise_spec_proposal` — all six are human-only; an agent-flagged token is rejected on every one |
 | **GitHub** | `get_github_repos`, `list_card_github_links`, `link_github_pr`, `link_github_commit`, `link_github_issue` |
 | **Agents** | `get_agent_identity`, `list_agent_accounts` |
 | **Agent runs** | `start_agent_run`, `get_agent_run`, `list_agent_runs`, `approve_agent_plan`, `report_agent_progress`, `cancel_agent_run` |
