@@ -238,8 +238,13 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def verify_card(card_ref: str) -> dict:
-        """Run a spec-verification pass on a card (an independent QA agent reviews
-        the accepted spec's quality/testability and posts a report)."""
+        """Run a spec-verification pass on a card (an independent agent reviews
+        the accepted spec's quality/testability and posts a report).
+
+        UNIFIED AGENT: any agent can verify — there is no QA-only role. The
+        server picks an active agent; separation-of-duties is enforced by the
+        card's verifier_policy (a different agent than the implementer by
+        default)."""
         async with SpryngClient() as c:
             return await c.post(
                 Config.org_url("agent-runs/verify-spec/"), {"card_ref": card_ref})
@@ -250,11 +255,14 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Run an INDEPENDENT verifier against the card's accepted spec.
 
-        Dispatches an adversarial Verification Specialist (a different QA-role
-        agent — never self-verification) to review the maker's changes against
-        the accepted spec + every evidence story, then post a QA report with a
-        structured VERDICT. Call this after a maker edit (e.g. Grok or Codex) to
-        prove the work — the Maker agents must never self-verify.
+        Dispatches an adversarial Verification Specialist (a DIFFERENT agent than
+        the maker — never self-verification) to review the maker's changes
+        against the accepted spec + every evidence story, then post a QA report
+        with a structured VERDICT. Call this after a maker edit (e.g. Grok or
+        Codex) to prove the work — the maker must never self-verify.
+
+        UNIFIED AGENT: any agent can verify (no QA-only role); the server's
+        verifier_policy enforces that it differs from the implementer.
 
         Args:
             card_ref: 'ON-914'-style card reference.
