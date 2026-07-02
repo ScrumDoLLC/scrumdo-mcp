@@ -91,7 +91,13 @@ def register(mcp: FastMCP) -> None:
     async def get_loop_status(loop_id: int) -> dict:
         """Fetch a loop's full status: state, iteration, last verdict, the
         `auto_loop` block, its runs + event timeline, evidence-story status, and
-        the accumulated cost."""
+        the accumulated cost.
+
+        This is also where log_loop_step's narrative steps and
+        attach_evidence's artifacts actually surface for reading — both
+        endpoints are write-only (POST) on the API, so there is no separate
+        get_loop_steps / get_loop_evidence tool. Look in the returned
+        `events` list for rows with `event_type` `log_step` and `evidence`."""
         async with SpryngClient() as c:
             return await c.get(Config.org_url(f"agent-loops/{loop_id}/"))
 
