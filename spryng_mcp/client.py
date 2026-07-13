@@ -17,7 +17,8 @@ class SpryngClient:
     """
 
     def __init__(self, *, agent_run_id: str | None = None,
-                 loop_id: str | None = None) -> None:
+                 loop_id: str | None = None,
+                 human_principal: bool = False) -> None:
         # Per BOARD_AI_AGENTS_UNIFIED_SPEC §13.2 — propagate the active
         # AgentRun id on every outbound request when the token is run-scoped.
         # Explicit ctor arg wins; otherwise fall back to Config.agent_run_id.
@@ -25,11 +26,26 @@ class SpryngClient:
         # GOVERNED_AGENT_LOOPS_SPEC §4 — loop correlation header.
         lp_id = (loop_id or Config.loop_id or "").strip()
 
+        # AI_COCKPIT_BRIDGE_SPEC.md §4.1 — human-principal mode. The backend's
+        # assert_human_actor treats ANY request carrying X-Spryng-Agent-Run as an
+        # agent and 403s the human-only cockpit actions (chat, draft-from-card,
+        # execute-task, loop start/steer, proposal accept/reject). A human-principal
+        # client therefore suppresses the run + loop headers regardless of env, so
+        # the request is attributed to the token's own (human/org) identity.
+        if human_principal:
+            run_id = ""
+            lp_id = ""
+
         headers: dict[str, str] = {
             "Authorization": f"Bearer {Config.token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            # §4.3 — write attribution (ignore-safe if the backend doesn't read it).
+            "X-Spryng-Source": "mcp",
+            "X-Spryng-Client": Config.client_name or "mcp",
         }
+        if Config.client_version:
+            headers["X-Spryng-Client-Version"] = Config.client_version
         if run_id:
             headers["X-Spryng-Agent-Run"] = run_id
         if lp_id:
@@ -40,6 +56,7 @@ class SpryngClient:
             timeout=30.0,
         )
         self._agent_run_id: str = run_id
+        self._human_principal: bool = human_principal
         # Cache: human-readable card ref (e.g. "ON-914") → numeric story id
         self._card_id_cache: dict[str, int] = {}
 
@@ -47,6 +64,12 @@ class SpryngClient:
     def agent_run_id(self) -> str:
         """The active AgentRun id propagated on every write, if any."""
         return self._agent_run_id
+
+    @property
+    def human_principal(self) -> bool:
+        """True when this client suppresses the run/loop headers so the backend
+        attributes writes to the token's own (human/org) identity (spec §4.1)."""
+        return self._human_principal
 
     async def __aenter__(self) -> "SpryngClient":
         return self
@@ -112,29 +135,47 @@ class SpryngClient:
 
     # ── Generic helpers ───────────────────────────────────────────────────────
 
+    @staticmethod
+    def _raise_for_status(r: httpx.Response) -> None:
+        """Like httpx's raise_for_status, but fold the API's error body into the
+        message so the caller (and the LLM) sees the backend's stable error code
+        (e.g. `chat_in_progress`, `already_active_run_id`, `out_of_order`,
+        `confirm_token`) instead of a bare '409 Conflict for <url>'."""
+        if not r.is_error:
+            return
+        try:
+            detail: Any = r.json()
+        except Exception:
+            detail = (r.text or "").strip()[:500]
+        raise httpx.HTTPStatusError(
+            f"{r.status_code} {r.reason_phrase} for "
+            f"{r.request.method} {r.request.url}: {detail}",
+            request=r.request, response=r,
+        )
+
     async def get(self, url: str, **params: Any) -> Any:
         r = await self._http.get(url, params=params or None)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def post(self, url: str, body: dict[str, Any]) -> Any:
         r = await self._http.post(url, json=body)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def patch(self, url: str, body: dict[str, Any]) -> Any:
         r = await self._http.patch(url, json=body)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def put(self, url: str, body: dict[str, Any] | list) -> Any:
         r = await self._http.put(url, json=body)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def delete(self, url: str) -> int:
         r = await self._http.delete(url)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.status_code
 
     # ── Boards / Projects ──────────────────────────────────────────────────────
@@ -491,5 +532,5 @@ class SpryngClient:
 
         async with httpx.AsyncClient(timeout=60.0) as http:
             r = await http.post(url, headers=auth_header, data=data, files=files)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()

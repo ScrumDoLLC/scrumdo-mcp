@@ -32,6 +32,7 @@ from .tools import (
     blockers,
     boards,
     cards,
+    cockpit,
     comments,
     fields,
     github,
@@ -82,6 +83,25 @@ Key conventions for this project:
 Use log_activity() to record agent actions against cards so the workspace
 activity log stays current and filterable.
 
+Card AI Cockpit bridge:
+  To understand a card in one shot, call get_card_cockpit_context(card_ref) —
+  it returns the cockpit's own aggregate (spec, configured agents + runtimes with
+  per-card readiness, your permissions, available actions, active loops, and
+  recent runs) rather than making you stitch five narrow reads together. Before
+  attempting a governed write, call get_effective_governance(card_ref) to see the
+  server-authoritative command policy (what's enabled/disabled and why, risk, and
+  whether it's human-only). get_mcp_capabilities() lists the whole tool surface +
+  connection context (a network-free smoke check).
+  To talk to a board agent on a card, use send_cockpit_chat(card_ref, message,
+  agent_profile_id) — its reply posts back into the cockpit timeline. To have an
+  agent draft a spec document, use draft_spec_from_card(card_ref, doc_type=...).
+  Both are HUMAN-ONLY: they run as a human principal (the run header is dropped),
+  so a run-scoped agent token is refused — use the agent-run tools to work a card
+  as an agent. The agent_profile_id these take is the `id` of a
+  get_card_cockpit_context configured_agents[] entry (filter by can_chat /
+  can_propose_spec); a chat reply lands in the card's `messages`
+  (get_card_cockpit_context(..., include=["messages"])).
+
 Spec proposals — the reviewed alternative to editing the spec directly:
   generate_spec_proposal / list_spec_proposals / accept_spec_proposal /
   reject_spec_proposal / request_spec_proposal_changes / revise_spec_proposal.
@@ -93,6 +113,11 @@ Spec proposals — the reviewed alternative to editing the spec directly:
   (subject to the frontmatter whitelist in step 3 below). accept_spec_proposal
   can trigger an execution run if the room has a runnable profile — it is a
   real "make this official" action, not a passive review note.
+  MCP decide gate: from an MCP session the backend requires a confirm_token to
+  accept/reject/request-changes on a proposal. Flow: get_decision_inbox() →
+  preview_spec_decision(proposal_id, action) to mint the token (bound to the
+  proposal's current version, 10-min TTL) → accept_spec_proposal(...,
+  confirm_token=<token>).
 
 If you are running as an AI agent (BOARD_AI_AGENTS_UNIFIED_SPEC §13.4):
   1. Call get_agent_identity() first; capture current_run_id.
@@ -151,6 +176,9 @@ agent_runs.register(mcp)
 loops.register(mcp)
 # Phase G (BOARD_AI_AGENTS_UNIFIED_SPEC §10) — AI intelligence tools.
 intelligence.register(mcp)
+# Card AI Cockpit bridge (AI_COCKPIT_BRIDGE_SPEC.md Slice 1) — cockpit-shaped
+# read + governance/capability discovery.
+cockpit.register(mcp)
 
 
 # ── Entrypoint ─────────────────────────────────────────────────────────────────

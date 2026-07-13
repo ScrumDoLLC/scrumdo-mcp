@@ -137,6 +137,213 @@ signatures per spec §13.3).
   PATCH handler reconciles to whatever the current format is. JSON
   merge patch semantics (e.g. null = delete) are NOT yet enforced.
 
+## Card AI Cockpit Bridge — Slice 1 (2026-07-13, v0.3.0)
+
+Per `AI_COCKPIT_BRIDGE_SPEC.md` (this repo), derived from
+`MassSense/docs/SCRUMDO_MCP_AI_COCKPIT_WRITE_SPEC.md` + a route map verified
+directly against `apps/api_v4` on 2026-07-13.
+
+Slice 1 (read + discovery, no backend change) — new module
+`spryng_mcp/tools/cockpit.py`, +3 tools (93 → 96):
+
+- `get_card_cockpit_context(card_ref, include?)` → `GET stories/<id>/ai-cockpit/`
+  (`StoryAiCockpitHandler`). The cockpit's own aggregate in one call: spec,
+  configured agents + runtimes w/ per-card readiness, permissions, available
+  actions, loops, recent runs. Compact by default (drops the ≤50-row `messages`
+  + `agent_profiles` blob unless `include=["all"]` or named).
+- `get_effective_governance(card_ref, agent_profile_id?)` →
+  `GET stories/<id>/agent-commands/` (`StoryAgentCommandsHandler`). The
+  server-authoritative command policy (enabled/disabled + reason, risk,
+  requires_human, dispatch_kind) + deciding `policy_source`. Story-scoped.
+- `get_mcp_capabilities()` — network-free connection context + full tool
+  registry enumeration (install/smoke aid). Per-card enforcement delegated to
+  `get_effective_governance`.
+
+Hardened `get_agent_identity()` — tolerates the `agents/whoami/` **404** (an
+org/human token, not an agent) instead of raising; adds `token_mode`
+(`run_scoped`|`agent`|`org_or_human`), `organization`, `project`, `run_context`,
+`writes_permitted`. This is load-bearing for the human-only cockpit writes in
+Slice 2 (the human-principal client mode, spec §4.1).
+
+Tests: `tests/test_cockpit_tools.py` (7) — default/all/explicit `include`
+selection, governance passthrough + param, capabilities registry+config, and
+both whoami paths (agent 200 + human 404). Suite 40 passed.
+
+## Card AI Cockpit Bridge — Slice 2 (2026-07-13, v0.3.1)
+
+Human-principal writes + attribution — +2 tools (96 → 98):
+
+- `SpryngClient(human_principal=True)` (`client.py`) suppresses the
+  `X-Spryng-Agent-Run` + `X-Spryng-Loop` headers regardless of env, so the
+  human-only cockpit actions are attributed to the token's own identity —
+  `assert_human_actor` 403s any request carrying the run header (spec §4.1).
+- Write attribution (spec §4.3): every request now carries `X-Spryng-Source: mcp`
+  + `X-Spryng-Client: <SCRUMDO_CLIENT_NAME>` (default `mcp`) + optional
+  `X-Spryng-Client-Version` (ignore-safe if the backend doesn't read them).
+- `send_cockpit_chat(card_ref, message, agent_profile_id?, media_ids?, scope_ref?)`
+  → `POST stories/<id>/ai-cockpit/` `{action:"message"}` — posts a governed card
+  message and dispatches a `kind='chat'` run whose reply lands in the cockpit
+  timeline. Human-only. 409 `chat_in_progress` when a run is active.
+- `draft_spec_from_card(card_ref, doc_type="requirements", instructions?,
+  card_fields?, agent_profile_id?, context_selection?)` → `POST
+  stories/<id>/ai-cockpit/` `{action:"draft_spec_from_card"}` — the cockpit's own
+  doc-type-aware draft path (returns `{run, proposal, runner_readiness}`).
+  Human-only.
+
+Tests: +3 in `tests/test_cockpit_tools.py` — human-principal header suppression
+(even with a run id in env) + attribution presence; chat posts as human
+(no run header on the write); draft posts action+doc_type+fields. Suite 43 passed.
+
+Remaining (spec §7): Slice 3 typed outcome/QA/evidence wrappers
+(`accept_proof`, `request_agent_replan`, `report_agent_verification`,
+`report_agent_outcome`) + `execute_task` + multi-doc spec `doc_type` ergonomics +
+MCP-Workbench `confirm_token` handshake for proposal accept.
+
+## Card AI Cockpit Bridge — Slice 3 (2026-07-13, v0.3.2)
+
+Typed human-only run-review wrappers — +3 tools (98 → 101), `agent_runs.py`,
+contracts verified directly against `apps/api_v4/handlers/agent_runs.py`:
+
+- `accept_proof(run_id, review_session_id?)` → `POST agent-runs/<id>/accept-proof/`
+  (`AgentRunAcceptProofHandler`). Human sign-off on an agent's QA proof (distinct
+  from the QA agent verdict); stamps `proof_accepted_*`. A supplied review session
+  must carry an `understood` disposition.
+- `request_agent_replan(run_id, comment)` → `POST agent-runs/<id>/replan/`
+  (`AgentRunReplanHandler`). Delta re-plan → new CHILD run; `comment` required
+  (the backend field is `comment`, not `reason`).
+- `execute_task(task_id, agent_id?)` → `POST agent-runs/execute-task/`
+  (`AgentRunExecuteTaskHandler`). Runs a spec-derived task with an agent
+  (Todo→Doing→Reviewing).
+
+Hardened `approve_agent_plan(run_id, review_session_id?)` — now runs as a human
+principal (drops the run header) + forwards an optional review-session id; it was
+previously issued on the default client and would 403 whenever a run id sat in the
+env (approve is human-only). All four run-review writes use
+`SpryngClient(human_principal=True)`.
+
+Tests: `tests/test_agent_run_review_tools.py` (5) — body shapes + human-principal
+header suppression (even with a run id in env). Suite 48 passed.
+
+Deferred to Slice 3b (contracts need real wiring, not guessed): the MCP-Workbench
+`confirm_token` handshake so `accept_spec_proposal` works from an MCP session
+(`_require_mcp_confirm_token` + `mint_confirm_token` via
+`workbench/proposals/<uuid>/preview-decision/`), and the multi-doc `doc_type`
+param on `get/set/patch_card_spec` (the spec handler's `doc_type` support is on the
+finalize path only today — needs a per-method read before exposing).
+
+## Card AI Cockpit Bridge — Slice 3b (2026-07-13, v0.3.3)
+
+MCP-Workbench decide gate — +3 tools (101 → 104), contracts verified against
+`apps/mcp_workbench/handlers.py` + `confirm_tokens.py`:
+
+- `get_decision_inbox()` → `GET organizations/<org>/decision-inbox/`
+  (`DecisionInboxHandler`). What's awaiting your human decision.
+- `preview_spec_decision(proposal_id, action)` →
+  `POST organizations/<org>/workbench/proposals/<uuid>/preview-decision/`
+  (`WbPreviewDecisionHandler`). The unskippable consequence preview and the ONLY
+  source of a `confirm_token`, bound to (user, proposal, current `target_hash`,
+  action) with a 10-min TTL. Returns `{action, descriptors, gate, confirm_token,
+  expires_in_seconds, decide, web_path}`.
+- `attest_spec_understood(proposal_id)` →
+  `POST workbench/proposals/<uuid>/understood/` (`WbProposalUnderstoodHandler`).
+
+Threaded an optional `confirm_token` into `accept_spec_proposal` /
+`reject_spec_proposal` / `request_spec_proposal_changes` (the backend's
+`_require_mcp_confirm_token` demands it from an MCP session — accept was
+previously unreachable from MCP) and hardened those three to run as a human
+principal. The gate flow: get_decision_inbox → (understood) → preview_spec_decision
+→ accept with the token; a token minted against a since-changed proposal is
+rejected, forcing a fresh preview.
+
+Tests: +4 in `tests/test_spec_proposal_tools.py` — confirm_token forwarding +
+human-principal on accept, preview mints/returns the token, inbox read, understood.
+Suite 52 passed. Existing accept-empty-body / reject-no-request-changes tests still
+pass (confirm_token is only added to the body when supplied).
+
+Still deferred: multi-doc `doc_type` on `get/set/patch_card_spec` — the primary
+spec GET/POST/PATCH don't read `doc_type` (only the finalize handler does), so
+doc-typed read/write needs its own doc-spec endpoint contract, not a param add.
+Drafting is already doc-type-aware via `draft_spec_from_card`.
+
+## Card AI Cockpit Bridge — Slice 3c (2026-07-13, v0.3.4)
+
+Multi-document specs — +3 tools (104 → 107), `spec.py`. The doc-spec endpoints
+turned out to exist (`spec_export.py`), so this is a clean adapter, not a param
+bolted onto the primary spec handler:
+
+- `list_card_spec_documents(card_ref)` → `GET stories/<id>/spec/docs/`
+  (`StorySpecDocsHandler.get`). Every doc_type slot (requirements/design/test/…)
+  with label, content, has-content, and open review-comment count.
+- `set_card_spec_document(card_ref, doc_type, content, fmt='md')` →
+  `POST stories/<id>/spec/docs/` (`StorySpecDocsHandler.post`). Human-only manual
+  create/replace of one doc_type; records an accepted version on change. Runs as a
+  human principal (agents use the whitelisted set_card_spec / patch_card_spec path).
+- `restore_spec_version(card_ref, version_number, doc_type='requirements')` →
+  `POST stories/<id>/spec/versions/restore/` (`StorySpecVersionRestoreHandler`).
+  Copies an accepted version FORWARD as a new version (history never rewritten).
+  Human-only.
+
+Tests: `tests/test_spec_docs_tools.py` (3) — list; doc write posts
+{doc_type,content,format} as human (no run header); restore posts
+{doc_type,version_number} as human. Suite 55 passed.
+
+This closes the last deferred write-spec item. The bridge now covers the full
+external-agent cockpit loop end to end.
+
+## Card AI Cockpit Bridge — verification pass (2026-07-13, v0.3.5)
+
+Re-verified all 15 new/modified tools' (URL, method, body) against the real
+handlers via an independent contract check — **no route/method/field mismatches**
+(decision-inbox + workbench are direct org children, not under `mcp/`; the
+ai-cockpit message field is `body`; spec/docs writes `format`; execute-task reads
+`task_id`+`agent_id`). Fixes found in the same pass:
+
+- **human-principal consistency**: `generate_spec_proposal`, `revise_spec_proposal`,
+  and `start_agent_run` are human-only but were still on the default client — a
+  human running with `SPRYNG_AGENT_RUN_ID` set would 403 on them while
+  accept/reject worked. Hardened all three to `human_principal=True`.
+- **`set_card_spec_document` reverted to the default client**: its gate is the
+  token-based `is_agent` with an assignment exception (assigned agents MAY write),
+  not the header-based `assert_human_actor`. Forcing a human principal stripped run
+  attribution for an assigned agent's write for no benefit — it now behaves like
+  `set_card_spec`/`patch_card_spec` (run-attributed).
+- **error surfacing**: `SpryngClient` now folds the API's JSON error body into the
+  raised `HTTPStatusError` message, so a caller sees the backend's stable code
+  (`chat_in_progress`, `already_active_run_id`, `out_of_order`, `confirm_token`, …)
+  instead of a bare `409 Conflict for <url>`.
+
+Tests: +3 (58 total) — generate/start run as human (no run header); error body is
+surfaced in the exception; set_card_spec_document stays run-attributed.
+
+Known-and-fine: `confirm_token` is optional in the tool schema but effectively
+required for a `UserMcpToken` session (enforced only for that transport); the
+docstrings already say "required from an MCP session".
+
+## Card AI Cockpit Bridge — flow pass (2026-07-13, v0.3.6)
+
+Traced the end-to-end flows an external agent runs and closed the one real friction:
+the `agent_profile_id` discovery path. Verified against the backend that
+`_serialize_agent` returns `id = AgentProfile.pk` and `_select_spec_drafting_agent`
+/ `_post_message` resolve `agent_profile_id` to that same pk — so
+`get_card_cockpit_context().configured_agents[].id` IS the value `send_cockpit_chat`
+/ `draft_spec_from_card` want. It was correct but implicit; since MCP tools are
+consumed by an LLM reading docstrings, that chaining knowledge IS the flow. Made it
+explicit (no behavior change):
+
+- `get_card_cockpit_context` docstring now states configured_agents[].id ==
+  agent_profile_id (filter by can_chat / can_propose_spec / can_execute_spec), and
+  that the chat transcript is in `messages` (request via include=["messages"]).
+- `send_cockpit_chat` / `draft_spec_from_card` arg docs point at
+  configured_agents[].id + the relevant capability flag; send_cockpit_chat also
+  documents how to read the reply (poll include=["messages"] for the ROLE_AGENT
+  message, or get_agent_run(chat_run_id) for run state).
+- Server instructions carry the same one-line chaining pointer up-front.
+
+No structural change was warranted — the two-call "context then governance" shape
+is intentional (distinct concerns), polling is inherent to the async runs, and the
+governed accept gate (preview → confirm_token → accept) can't be shortened without
+weakening the guarantee. Suite 58 passed.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the

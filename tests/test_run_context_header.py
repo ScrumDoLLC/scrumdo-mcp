@@ -73,3 +73,17 @@ async def test_header_from_env_var(monkeypatch):
     assert any(
         h.get("x-spryng-agent-run") == "env-run-99" for h in captured
     )
+
+
+@respx.mock
+async def test_error_body_surfaced_in_exception(monkeypatch):
+    import httpx
+    import pytest
+    monkeypatch.setattr(Config, "agent_run_id", "")
+    respx.post(Config.org_url("agent-runs/")).mock(return_value=Response(
+        409, json={"error": "already active", "already_active_run_id": 7}))
+    async with SpryngClient() as c:
+        with pytest.raises(httpx.HTTPStatusError) as ei:
+            await c.post(Config.org_url("agent-runs/"), {})
+    msg = str(ei.value)
+    assert "409" in msg and "already_active_run_id" in msg

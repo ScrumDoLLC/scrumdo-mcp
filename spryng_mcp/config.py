@@ -44,6 +44,15 @@ class Config:
     # `X-Spryng-Loop` and can be grouped into the loop's timeline.
     loop_id: str = _env("SPRYNG_LOOP_ID", "SCRUMDO_LOOP_ID", default="")
 
+    # AI_COCKPIT_BRIDGE_SPEC.md §4.3 — write attribution. Every request carries
+    # `X-Spryng-Source: mcp` + a client name so the Card AI Cockpit can render
+    # "via MCP (<client>)". Set SCRUMDO_CLIENT_NAME to the host tool (codex /
+    # claude-code / cursor); defaults to "mcp".
+    client_name: str = _env("SCRUMDO_CLIENT_NAME", "SPRYNG_CLIENT_NAME",
+                            default="mcp")
+    client_version: str = _env("SCRUMDO_CLIENT_VERSION", "SPRYNG_CLIENT_VERSION",
+                               default="")
+
     @classmethod
     def validate(cls) -> None:
         if not cls.token:
