@@ -188,3 +188,17 @@ async def test_attest_spec_understood_posts_empty_body():
     result = await _tool("attest_spec_understood")(proposal_id=PROPOSAL_UUID)
     assert json.loads(route.calls.last.request.content) == {}
     assert result["understood"] is True
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_generate_runs_as_human(monkeypatch):
+    # generate is human-only; a run id in env must not ride on it.
+    monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    _mock_card_resolution()
+    route = respx.post(
+        Config.project_url(f"stories/{CARD_ID}/spec-proposals/generate/")
+    ).mock(return_value=Response(202, json={
+        "proposal_id": "p", "status": "generating", "agent_run_id": 1}))
+    await _tool("generate_spec_proposal")(card_ref="ON-914")
+    assert "x-spryng-agent-run" not in route.calls.last.request.headers

@@ -290,6 +290,35 @@ Tests: `tests/test_spec_docs_tools.py` (3) — list; doc write posts
 This closes the last deferred write-spec item. The bridge now covers the full
 external-agent cockpit loop end to end.
 
+## Card AI Cockpit Bridge — verification pass (2026-07-13, v0.3.5)
+
+Re-verified all 15 new/modified tools' (URL, method, body) against the real
+handlers via an independent contract check — **no route/method/field mismatches**
+(decision-inbox + workbench are direct org children, not under `mcp/`; the
+ai-cockpit message field is `body`; spec/docs writes `format`; execute-task reads
+`task_id`+`agent_id`). Fixes found in the same pass:
+
+- **human-principal consistency**: `generate_spec_proposal`, `revise_spec_proposal`,
+  and `start_agent_run` are human-only but were still on the default client — a
+  human running with `SPRYNG_AGENT_RUN_ID` set would 403 on them while
+  accept/reject worked. Hardened all three to `human_principal=True`.
+- **`set_card_spec_document` reverted to the default client**: its gate is the
+  token-based `is_agent` with an assignment exception (assigned agents MAY write),
+  not the header-based `assert_human_actor`. Forcing a human principal stripped run
+  attribution for an assigned agent's write for no benefit — it now behaves like
+  `set_card_spec`/`patch_card_spec` (run-attributed).
+- **error surfacing**: `SpryngClient` now folds the API's JSON error body into the
+  raised `HTTPStatusError` message, so a caller sees the backend's stable code
+  (`chat_in_progress`, `already_active_run_id`, `out_of_order`, `confirm_token`, …)
+  instead of a bare `409 Conflict for <url>`.
+
+Tests: +3 (58 total) — generate/start run as human (no run header); error body is
+surfaced in the exception; set_card_spec_document stays run-attributed.
+
+Known-and-fine: `confirm_token` is optional in the tool schema but effectively
+required for a `UserMcpToken` session (enforced only for that transport); the
+docstrings already say "required from an MCP session".
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the

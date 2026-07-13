@@ -193,22 +193,25 @@ def register(mcp: FastMCP) -> None:
         content: str,
         fmt: str = 'md',
     ) -> dict:
-        """Create or replace one doc_type's spec document (human-only).
+        """Create or replace one doc_type's spec document.
 
         The multi-document counterpart to set_card_spec — writes the `design`,
         `test`, or any non-requirements document (for `requirements`, prefer
         set_card_spec). Records an accepted version when the content changes.
-        Runs as a human principal; a run-scoped / agent token is refused (agents
-        use the whitelisted set_card_spec / patch_card_spec path instead).
+
+        Write-gated like set_card_spec/patch_card_spec: the caller needs write
+        access to the card; an agent assigned to the card may also write (and the
+        write is attributed to its run), so this uses the default client rather
+        than forcing a human principal.
 
         Args:
             card_ref: 'ON-914'-style reference.
             doc_type: 'requirements' | 'design' | 'test' | … (see
                 list_card_spec_documents for the valid slots).
             content: Full document content.
-            fmt: 'md' (default) | 'json' | 'yaml'.
+            fmt: 'md' (default) | 'json' | 'yaml'. Sent as the `format` field.
         """
-        async with SpryngClient(human_principal=True) as c:
+        async with SpryngClient() as c:
             story_id = await c._resolve_card_id(card_ref)
             return await c.post(
                 Config.project_url(f'stories/{story_id}/spec/docs/'),

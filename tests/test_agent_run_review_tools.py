@@ -82,3 +82,13 @@ async def test_approve_agent_plan_runs_as_human(monkeypatch):
     await _tool("approve_agent_plan")(run_id=55)
     # Hardened: approve is human-only, so the run header must be suppressed.
     assert "x-spryng-agent-run" not in route.calls.last.request.headers
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_start_agent_run_as_human(monkeypatch):
+    monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    route = respx.post(Config.org_url("agent-runs/")).mock(
+        return_value=Response(201, json={"id": 5, "state": "queued"}))
+    await _tool("start_agent_run")(card_ref="ON-914")
+    assert "x-spryng-agent-run" not in route.calls.last.request.headers

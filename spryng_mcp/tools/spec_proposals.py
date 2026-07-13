@@ -68,7 +68,7 @@ def register(mcp: FastMCP) -> None:
             body["repo_full_name"] = repo_full_name
         if card_fields:
             body["selection"] = {"card_fields": list(card_fields)}
-        async with SpryngClient() as c:
+        async with SpryngClient(human_principal=True) as c:
             story_id = await c._resolve_card_id(card_ref)
             return await c.post(
                 Config.project_url(
@@ -228,7 +228,7 @@ def register(mcp: FastMCP) -> None:
         body: dict = {}
         if repo_full_name:
             body["repo_full_name"] = repo_full_name
-        async with SpryngClient() as c:
+        async with SpryngClient(human_principal=True) as c:
             story_id = await c._resolve_card_id(card_ref)
             return await c.post(
                 Config.project_url(

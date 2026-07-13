@@ -135,29 +135,47 @@ class SpryngClient:
 
     # ── Generic helpers ───────────────────────────────────────────────────────
 
+    @staticmethod
+    def _raise_for_status(r: httpx.Response) -> None:
+        """Like httpx's raise_for_status, but fold the API's error body into the
+        message so the caller (and the LLM) sees the backend's stable error code
+        (e.g. `chat_in_progress`, `already_active_run_id`, `out_of_order`,
+        `confirm_token`) instead of a bare '409 Conflict for <url>'."""
+        if not r.is_error:
+            return
+        try:
+            detail: Any = r.json()
+        except Exception:
+            detail = (r.text or "").strip()[:500]
+        raise httpx.HTTPStatusError(
+            f"{r.status_code} {r.reason_phrase} for "
+            f"{r.request.method} {r.request.url}: {detail}",
+            request=r.request, response=r,
+        )
+
     async def get(self, url: str, **params: Any) -> Any:
         r = await self._http.get(url, params=params or None)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def post(self, url: str, body: dict[str, Any]) -> Any:
         r = await self._http.post(url, json=body)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def patch(self, url: str, body: dict[str, Any]) -> Any:
         r = await self._http.patch(url, json=body)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def put(self, url: str, body: dict[str, Any] | list) -> Any:
         r = await self._http.put(url, json=body)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     async def delete(self, url: str) -> int:
         r = await self._http.delete(url)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.status_code
 
     # ── Boards / Projects ──────────────────────────────────────────────────────
@@ -514,5 +532,5 @@ class SpryngClient:
 
         async with httpx.AsyncClient(timeout=60.0) as http:
             r = await http.post(url, headers=auth_header, data=data, files=files)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()

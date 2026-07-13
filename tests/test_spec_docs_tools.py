@@ -45,8 +45,9 @@ async def test_list_card_spec_documents():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_set_card_spec_document_posts_as_human(monkeypatch):
-    # Doc write is human-only — a run id in env must not ride on it.
+async def test_set_card_spec_document_posts_doc_type_and_is_run_attributed(monkeypatch):
+    # Doc write is the agent-writable path (like set_card_spec): an assigned
+    # agent's run header rides on it so the write is run-attributed.
     monkeypatch.setattr(Config, "agent_run_id", "run-99")
     _mock_card_resolution()
     route = respx.post(Config.project_url(f"stories/{CARD_ID}/spec/docs/")).mock(
@@ -56,7 +57,7 @@ async def test_set_card_spec_document_posts_as_human(monkeypatch):
 
     assert json.loads(route.calls.last.request.content) == {
         "doc_type": "design", "content": "# Design", "format": "md"}
-    assert "x-spryng-agent-run" not in route.calls.last.request.headers
+    assert route.calls.last.request.headers.get("x-spryng-agent-run") == "run-99"
     assert result["version"] == 4
 
 

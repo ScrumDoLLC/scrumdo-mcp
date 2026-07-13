@@ -19,6 +19,11 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Open a new AgentRun on a card in `queued` state.
 
+        Human-only: agents are dispatched into runs, they don't start them (the
+        backend rejects an agent-flagged caller), so this runs as a human
+        principal (the X-Spryng-Agent-Run header is suppressed — an agent
+        orchestrating sub-agents uses route_to_agent inside a loop instead).
+
         Returns 409 with `already_active_run_id` if a run is in-flight.
 
         Args:
@@ -30,7 +35,7 @@ def register(mcp: FastMCP) -> None:
         body: dict = {'card_ref': card_ref}
         if agent_id is not None:
             body['agent_id'] = agent_id
-        async with SpryngClient() as c:
+        async with SpryngClient(human_principal=True) as c:
             return await c.post(Config.org_url('agent-runs/'), body)
 
     @mcp.tool()
