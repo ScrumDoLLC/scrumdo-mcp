@@ -58,6 +58,12 @@ def register(mcp: FastMCP) -> None:
         Returns {card_ref, story_id, <selected sections>}. Use the narrower tools
         (get_card_spec, list_agent_runs, get_loop_status, …) when you need full
         detail on one section.
+
+        Chaining note: each `configured_agents[]` entry's `id` IS the
+        `agent_profile_id` you pass to send_cockpit_chat / draft_spec_from_card —
+        filter by `can_chat` / `can_propose_spec` / `can_execute_spec` to pick a
+        capable one. The chat transcript is in `messages` (request it with
+        include=["messages"]; omitted by default because it can be large).
         """
         async with SpryngClient() as c:
             story_id = await c._resolve_card_id(card_ref)
@@ -203,13 +209,16 @@ def register(mcp: FastMCP) -> None:
 
         Returns `{message, chat_run_id}` (chat_run_id is null when no run was
         dispatched). Raises 409 `chat_in_progress` if a run is already active on the
-        card — wait for it (poll get_card_cockpit_context) and retry.
+        card — wait for it and retry. To read the agent's reply, poll
+        get_card_cockpit_context(card_ref, include=["messages"]) until a new
+        ROLE_AGENT message appears (or get_agent_run(chat_run_id) for run state).
 
         Args:
             card_ref: 'ON-914'-style reference.
             message: The chat body (markdown).
-            agent_profile_id: Which agent to dispatch the reply to. Omit to post the
-                message without starting an agent run.
+            agent_profile_id: Which agent to dispatch the reply to — the `id` of an
+                entry in get_card_cockpit_context's configured_agents[] whose
+                `can_chat` is true. Omit to post the message without starting a run.
             media_ids: Optional governed-media ids to attach.
             scope_ref: Optional `{type, id?}` scoping the message to a sub-object.
         """
@@ -250,7 +259,9 @@ def register(mcp: FastMCP) -> None:
                 'test'). Defaults to 'requirements'.
             instructions: Free-text guidance for the draft (≤4000 chars).
             card_fields: Custom-field names to spotlight in the agent's context.
-            agent_profile_id: Which agent drafts. Defaults to the card's configured
+            agent_profile_id: Which agent drafts — the `id` of an entry in
+                get_card_cockpit_context's configured_agents[] whose
+                `can_propose_spec` is true. Omit to let the backend pick a capable
                 agent.
             context_selection: Optional structured context selector (advanced).
 

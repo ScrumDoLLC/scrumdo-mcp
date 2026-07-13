@@ -319,6 +319,31 @@ Known-and-fine: `confirm_token` is optional in the tool schema but effectively
 required for a `UserMcpToken` session (enforced only for that transport); the
 docstrings already say "required from an MCP session".
 
+## Card AI Cockpit Bridge — flow pass (2026-07-13, v0.3.6)
+
+Traced the end-to-end flows an external agent runs and closed the one real friction:
+the `agent_profile_id` discovery path. Verified against the backend that
+`_serialize_agent` returns `id = AgentProfile.pk` and `_select_spec_drafting_agent`
+/ `_post_message` resolve `agent_profile_id` to that same pk — so
+`get_card_cockpit_context().configured_agents[].id` IS the value `send_cockpit_chat`
+/ `draft_spec_from_card` want. It was correct but implicit; since MCP tools are
+consumed by an LLM reading docstrings, that chaining knowledge IS the flow. Made it
+explicit (no behavior change):
+
+- `get_card_cockpit_context` docstring now states configured_agents[].id ==
+  agent_profile_id (filter by can_chat / can_propose_spec / can_execute_spec), and
+  that the chat transcript is in `messages` (request via include=["messages"]).
+- `send_cockpit_chat` / `draft_spec_from_card` arg docs point at
+  configured_agents[].id + the relevant capability flag; send_cockpit_chat also
+  documents how to read the reply (poll include=["messages"] for the ROLE_AGENT
+  message, or get_agent_run(chat_run_id) for run state).
+- Server instructions carry the same one-line chaining pointer up-front.
+
+No structural change was warranted — the two-call "context then governance" shape
+is intentional (distinct concerns), polling is inherent to the async runs, and the
+governed accept gate (preview → confirm_token → accept) can't be shortened without
+weakening the guarantee. Suite 58 passed.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the

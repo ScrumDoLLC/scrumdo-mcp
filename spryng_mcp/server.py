@@ -97,7 +97,10 @@ Card AI Cockpit bridge:
   agent draft a spec document, use draft_spec_from_card(card_ref, doc_type=...).
   Both are HUMAN-ONLY: they run as a human principal (the run header is dropped),
   so a run-scoped agent token is refused — use the agent-run tools to work a card
-  as an agent.
+  as an agent. The agent_profile_id these take is the `id` of a
+  get_card_cockpit_context configured_agents[] entry (filter by can_chat /
+  can_propose_spec); a chat reply lands in the card's `messages`
+  (get_card_cockpit_context(..., include=["messages"])).
 
 Spec proposals — the reviewed alternative to editing the spec directly:
   generate_spec_proposal / list_spec_proposals / accept_spec_proposal /
