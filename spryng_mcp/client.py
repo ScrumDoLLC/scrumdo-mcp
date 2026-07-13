@@ -141,6 +141,21 @@ class SpryngClient:
         message so the caller (and the LLM) sees the backend's stable error code
         (e.g. `chat_in_progress`, `already_active_run_id`, `out_of_order`,
         `confirm_token`) instead of a bare '409 Conflict for <url>'."""
+        # A JSON API should never redirect us. This client does NOT follow
+        # redirects, so a 3xx means the endpoint isn't being served here (wrong /
+        # undeployed backend) or bounces unauthenticated API calls to a login page.
+        # Flag it clearly instead of letting the empty redirect body blow up later
+        # as a cryptic `json.JSONDecodeError: Expecting value: line 1 column 1`.
+        if r.is_redirect:
+            loc = r.headers.get("location", "?")
+            raise httpx.HTTPStatusError(
+                f"{r.status_code} redirect to {loc} for {r.request.method} "
+                f"{r.request.url} — the API returned a redirect instead of JSON. "
+                f"This usually means the endpoint isn't available on this server "
+                f"(check SCRUMDO_BASE_URL points at a backend where it's deployed) "
+                f"or the token can't access it.",
+                request=r.request, response=r,
+            )
         if not r.is_error:
             return
         try:

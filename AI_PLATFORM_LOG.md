@@ -344,6 +344,29 @@ is intentional (distinct concerns), polling is inherent to the async runs, and t
 governed accept gate (preview → confirm_token → accept) can't be shortened without
 weakening the guarantee. Suite 58 passed.
 
+## Card AI Cockpit Bridge — redirect-clarity fix (2026-07-13, v0.3.7, unreleased)
+
+Live smoke against production `app.spryng.io` surfaced two things:
+
+1. **Deploy gap (not an MCP bug):** the `api_v4` card sub-resource endpoints the
+   cockpit + spec tools call (`stories/<id>/spec/`, `.../ai-cockpit/`,
+   `.../agent-commands/`) return **302 → `app.spryng.io/`** on prod, while the base
+   `stories/` list returns 200 JSON. The MassSense cockpit/spec backend (ScrumDo-2026
+   line) isn't deployed to production yet, so these tools have nothing to talk to
+   there. The bridge needs `SCRUMDO_BASE_URL` pointed at a backend where those routes
+   are live (staging / local MassSense).
+2. **Client bug it exposed:** the client doesn't follow redirects, and
+   `_raise_for_status` only treated 4xx/5xx as errors — so a 302 slipped through to
+   `r.json()` on an empty body and blew up as a cryptic
+   `json.JSONDecodeError: Expecting value: line 1 column 1`. Fixed: `_raise_for_status`
+   now raises a clear `HTTPStatusError` on any 3xx ("… returned a redirect instead of
+   JSON … check SCRUMDO_BASE_URL …"). Turns an opaque failure into an actionable one
+   across all 107 tools.
+
+Test: +1 in `tests/test_run_context_header.py` (302 → clear error). Suite 59 passed.
+Committed on `fix/redirect-error-clarity`; not published — will ride the next release
+once the cockpit backend is deployed.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the
