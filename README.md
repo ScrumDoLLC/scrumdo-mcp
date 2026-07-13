@@ -123,7 +123,7 @@ Once connected, just talk to your AI tool naturally:
 
 ---
 
-## Available tools (104 total)
+## Available tools (107 total)
 
 | Group | Tools |
 |-------|-------|
@@ -139,7 +139,7 @@ Once connected, just talk to your AI tool naturally:
 | **Activity** | `log_activity`, `get_activity_log`, `get_workspace_activity` |
 | **Webhooks** | `list_webhooks`, `create_webhook`, `delete_webhook` |
 | **Time** | `list_time_entries`, `log_time` |
-| **Spec** | `get_card_spec`, `set_card_spec`, `patch_card_spec`, `get_spec_history` |
+| **Spec** | `get_card_spec`, `set_card_spec`, `patch_card_spec`, `get_spec_history`, `list_card_spec_documents`, `set_card_spec_document`, `restore_spec_version` — get/set/patch operate on the primary (`requirements`) doc; the multi-doc trio lists per-`doc_type` documents, writes a specific one (human-only), and restores an accepted version forward |
 | **Spec proposals** | `generate_spec_proposal`, `list_spec_proposals`, `accept_spec_proposal`, `reject_spec_proposal`, `request_spec_proposal_changes`, `revise_spec_proposal`, `get_decision_inbox`, `preview_spec_decision`, `attest_spec_understood` — all human-only; deciding from an MCP session is gated: `get_decision_inbox` → `preview_spec_decision` mints a `confirm_token` (bound to the proposal's current version, 10-min TTL) → pass it to `accept`/`reject`/`request_changes` |
 | **GitHub** | `get_github_repos`, `list_card_github_links`, `link_github_pr`, `link_github_commit`, `link_github_issue` |
 | **Cockpit** | `get_card_cockpit_context`, `get_effective_governance`, `get_mcp_capabilities`, `send_cockpit_chat`, `draft_spec_from_card` — the Card AI Cockpit bridge: one-call card context, the governed command policy for a card, this bridge's own tool/connection surface, plus human-only cockpit writes (chat a board agent, draft a spec doc). MCP writes are attributed to the cockpit timeline via `X-Spryng-Source: mcp` |

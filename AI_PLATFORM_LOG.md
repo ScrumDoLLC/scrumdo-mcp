@@ -265,6 +265,31 @@ spec GET/POST/PATCH don't read `doc_type` (only the finalize handler does), so
 doc-typed read/write needs its own doc-spec endpoint contract, not a param add.
 Drafting is already doc-type-aware via `draft_spec_from_card`.
 
+## Card AI Cockpit Bridge — Slice 3c (2026-07-13, v0.3.4)
+
+Multi-document specs — +3 tools (104 → 107), `spec.py`. The doc-spec endpoints
+turned out to exist (`spec_export.py`), so this is a clean adapter, not a param
+bolted onto the primary spec handler:
+
+- `list_card_spec_documents(card_ref)` → `GET stories/<id>/spec/docs/`
+  (`StorySpecDocsHandler.get`). Every doc_type slot (requirements/design/test/…)
+  with label, content, has-content, and open review-comment count.
+- `set_card_spec_document(card_ref, doc_type, content, fmt='md')` →
+  `POST stories/<id>/spec/docs/` (`StorySpecDocsHandler.post`). Human-only manual
+  create/replace of one doc_type; records an accepted version on change. Runs as a
+  human principal (agents use the whitelisted set_card_spec / patch_card_spec path).
+- `restore_spec_version(card_ref, version_number, doc_type='requirements')` →
+  `POST stories/<id>/spec/versions/restore/` (`StorySpecVersionRestoreHandler`).
+  Copies an accepted version FORWARD as a new version (history never rewritten).
+  Human-only.
+
+Tests: `tests/test_spec_docs_tools.py` (3) — list; doc write posts
+{doc_type,content,format} as human (no run header); restore posts
+{doc_type,version_number} as human. Suite 55 passed.
+
+This closes the last deferred write-spec item. The bridge now covers the full
+external-agent cockpit loop end to end.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the

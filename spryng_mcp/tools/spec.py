@@ -159,3 +159,84 @@ def register(mcp: FastMCP) -> None:
             return await c.patch(
                 Config.project_url(f'stories/{story_id}/spec/'), body,
             )
+
+    # ── Multi-document specs (Card AI Cockpit v2 Phase 1) ────────────────────
+    #
+    # get/set/patch_card_spec above operate on the card's PRIMARY spec (the
+    # `requirements` document). A card can also carry other doc_types (design,
+    # test, …); these three tools list them and write/restore a specific one.
+
+    @mcp.tool()
+    async def list_card_spec_documents(card_ref: str) -> dict:
+        """List a card's per-doc_type spec documents (multi-doc model).
+
+        Returns every doc_type slot (requirements, design, test, …) with its
+        label, current content, has-content flag, and open review-comment count —
+        the data behind the cockpit's doc-type tab strip. Use it to discover which
+        documents exist before reading or writing a specific one.
+
+        Args:
+            card_ref: 'ON-914'-style reference.
+
+        Returns {docs: [{doc_type, label, content, has_content,
+        review_open_comments}, ...], ...}.
+        """
+        async with SpryngClient() as c:
+            story_id = await c._resolve_card_id(card_ref)
+            return await c.get(
+                Config.project_url(f'stories/{story_id}/spec/docs/'))
+
+    @mcp.tool()
+    async def set_card_spec_document(
+        card_ref: str,
+        doc_type: str,
+        content: str,
+        fmt: str = 'md',
+    ) -> dict:
+        """Create or replace one doc_type's spec document (human-only).
+
+        The multi-document counterpart to set_card_spec — writes the `design`,
+        `test`, or any non-requirements document (for `requirements`, prefer
+        set_card_spec). Records an accepted version when the content changes.
+        Runs as a human principal; a run-scoped / agent token is refused (agents
+        use the whitelisted set_card_spec / patch_card_spec path instead).
+
+        Args:
+            card_ref: 'ON-914'-style reference.
+            doc_type: 'requirements' | 'design' | 'test' | … (see
+                list_card_spec_documents for the valid slots).
+            content: Full document content.
+            fmt: 'md' (default) | 'json' | 'yaml'.
+        """
+        async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            return await c.post(
+                Config.project_url(f'stories/{story_id}/spec/docs/'),
+                {'doc_type': doc_type, 'content': content, 'format': fmt},
+            )
+
+    @mcp.tool()
+    async def restore_spec_version(
+        card_ref: str,
+        version_number: int,
+        doc_type: str = 'requirements',
+    ) -> dict:
+        """Restore an accepted spec version by copying it FORWARD as a new version.
+
+        History is never rewritten — the restore appends the old content as the
+        latest version. Human-only (runs as a human principal).
+
+        Args:
+            card_ref: 'ON-914'-style reference.
+            version_number: The accepted version to restore (from
+                get_spec_history / the versions list).
+            doc_type: Which document's history to restore into. Defaults to
+                'requirements'.
+        """
+        async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            return await c.post(
+                Config.project_url(
+                    f'stories/{story_id}/spec/versions/restore/'),
+                {'doc_type': doc_type, 'version_number': version_number},
+            )

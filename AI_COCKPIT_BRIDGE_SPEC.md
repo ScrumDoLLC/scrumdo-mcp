@@ -1,8 +1,7 @@
 # scrumdo-mcp — AI Cockpit Bridge Spec
 
-Status: Slices 1–3b shipped (v0.3.3, 104 tools). The full external-agent loop is
-covered. Remaining: multi-doc `doc_type` on get/set/patch_card_spec (needs a
-doc-spec endpoint contract — drafting is already doc-type-aware).
+Status: COMPLETE — Slices 1–3c shipped (v0.3.4, 107 tools). The full external-agent
+cockpit loop is covered; no write-spec items remain open.
 Date: 2026-07-13
 Baseline: `scrumdo-mcp` v0.2.13, 93 tools, branch `feat/ai-cockpit-bridge`.
 
