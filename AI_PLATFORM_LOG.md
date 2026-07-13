@@ -199,6 +199,38 @@ Remaining (spec §7): Slice 3 typed outcome/QA/evidence wrappers
 `report_agent_outcome`) + `execute_task` + multi-doc spec `doc_type` ergonomics +
 MCP-Workbench `confirm_token` handshake for proposal accept.
 
+## Card AI Cockpit Bridge — Slice 3 (2026-07-13, v0.3.2)
+
+Typed human-only run-review wrappers — +3 tools (98 → 101), `agent_runs.py`,
+contracts verified directly against `apps/api_v4/handlers/agent_runs.py`:
+
+- `accept_proof(run_id, review_session_id?)` → `POST agent-runs/<id>/accept-proof/`
+  (`AgentRunAcceptProofHandler`). Human sign-off on an agent's QA proof (distinct
+  from the QA agent verdict); stamps `proof_accepted_*`. A supplied review session
+  must carry an `understood` disposition.
+- `request_agent_replan(run_id, comment)` → `POST agent-runs/<id>/replan/`
+  (`AgentRunReplanHandler`). Delta re-plan → new CHILD run; `comment` required
+  (the backend field is `comment`, not `reason`).
+- `execute_task(task_id, agent_id?)` → `POST agent-runs/execute-task/`
+  (`AgentRunExecuteTaskHandler`). Runs a spec-derived task with an agent
+  (Todo→Doing→Reviewing).
+
+Hardened `approve_agent_plan(run_id, review_session_id?)` — now runs as a human
+principal (drops the run header) + forwards an optional review-session id; it was
+previously issued on the default client and would 403 whenever a run id sat in the
+env (approve is human-only). All four run-review writes use
+`SpryngClient(human_principal=True)`.
+
+Tests: `tests/test_agent_run_review_tools.py` (5) — body shapes + human-principal
+header suppression (even with a run id in env). Suite 48 passed.
+
+Deferred to Slice 3b (contracts need real wiring, not guessed): the MCP-Workbench
+`confirm_token` handshake so `accept_spec_proposal` works from an MCP session
+(`_require_mcp_confirm_token` + `mint_confirm_token` via
+`workbench/proposals/<uuid>/preview-decision/`), and the multi-doc `doc_type`
+param on `get/set/patch_card_spec` (the spec handler's `doc_type` support is on the
+finalize path only today — needs a per-method read before exposing).
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the

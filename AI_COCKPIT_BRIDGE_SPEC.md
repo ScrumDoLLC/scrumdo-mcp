@@ -1,6 +1,7 @@
 # scrumdo-mcp — AI Cockpit Bridge Spec
 
-Status: Slices 1–2 shipped (v0.3.1, 98 tools); Slice 3 remaining.
+Status: Slices 1–3 core shipped (v0.3.2, 101 tools); Slice 3b remaining
+(confirm_token handshake + multi-doc `doc_type` on get/set/patch).
 Date: 2026-07-13
 Baseline: `scrumdo-mcp` v0.2.13, 93 tools, branch `feat/ai-cockpit-bridge`.
 

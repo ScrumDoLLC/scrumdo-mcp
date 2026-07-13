@@ -48,15 +48,91 @@ def register(mcp: FastMCP) -> None:
             )
 
     @mcp.tool()
-    async def approve_agent_plan(run_id: int) -> dict:
+    async def approve_agent_plan(run_id: int, review_session_id: str = '') -> dict:
         """Approve a run's plan; transitions awaiting_approval → executing.
 
-        Agents cannot approve their own plans (spec §F.2); the backend
-        enforces this with 403.
+        Human-only: agents cannot approve their own plans (spec §F.2), and the
+        backend's assert_human_actor rejects any request carrying the run header,
+        so this runs as a human principal (the X-Spryng-Agent-Run header is
+        suppressed — AI_COCKPIT_BRIDGE_SPEC.md §4.1).
+
+        Args:
+            run_id: AgentRun id.
+            review_session_id: Optional governed review-session id — when supplied,
+                it must carry an approving disposition.
         """
-        async with SpryngClient() as c:
+        body: dict = {}
+        if review_session_id:
+            body['review_session_id'] = review_session_id
+        async with SpryngClient(human_principal=True) as c:
             return await c.post(
-                Config.org_url(f'agent-runs/{run_id}/approve/'), {},
+                Config.org_url(f'agent-runs/{run_id}/approve/'), body,
+            )
+
+    @mcp.tool()
+    async def accept_proof(run_id: int, review_session_id: str = '') -> dict:
+        """Human-accept a run's QA proof — distinct from the QA agent's verdict.
+
+        Stamps proof_accepted_* on the run. This is the human sign-off on an
+        agent's verification evidence (Slice 09D). Human-only (runs as a human
+        principal). When a governed review session is supplied it must carry an
+        ``understood`` disposition, or the backend rejects the acceptance.
+
+        Args:
+            run_id: AgentRun id.
+            review_session_id: Optional governed review-session id.
+        """
+        body: dict = {}
+        if review_session_id:
+            body['review_session_id'] = review_session_id
+        async with SpryngClient(human_principal=True) as c:
+            return await c.post(
+                Config.org_url(f'agent-runs/{run_id}/accept-proof/'), body,
+            )
+
+    @mcp.tool()
+    async def request_agent_replan(run_id: int, comment: str) -> dict:
+        """Request a delta re-plan on a run — creates a CHILD run (spec §E.5a).
+
+        Use this when a plan needs changes rather than outright approval or
+        cancellation: the agent re-plans against your comment, producing a child
+        run you then review. Human-only (runs as a human principal).
+
+        Args:
+            run_id: The parent AgentRun id.
+            comment: What needs to change — REQUIRED; handed to the agent verbatim.
+
+        Returns the new child run (201).
+        """
+        async with SpryngClient(human_principal=True) as c:
+            return await c.post(
+                Config.org_url(f'agent-runs/{run_id}/replan/'),
+                {'comment': comment},
+            )
+
+    @mcp.tool()
+    async def execute_task(task_id: int, agent_id: int | None = None) -> dict:
+        """Run a spec-derived Task with an agent (Todo → Doing → Reviewing).
+
+        Only tasks materialized from a spec (carrying spec context) are runnable;
+        the task must be next in execution order. On success the task moves to
+        Doing and an AgentRun is dispatched; it lands in Reviewing on completion,
+        or back to Todo on failure/cancel. Human-only (runs as a human principal).
+
+        Args:
+            task_id: The task id (from list_tasks — these are globally-unique ids).
+            agent_id: Which runner-backed agent executes. Defaults to a suitable
+                runner-backed agent on the card's room.
+
+        Returns {run, task_id, execution}. Errors: 404 task-not-found; 400
+        no_agent; 422 no_runner / out_of_order (with blocked_by).
+        """
+        body: dict = {'task_id': task_id}
+        if agent_id is not None:
+            body['agent_id'] = agent_id
+        async with SpryngClient(human_principal=True) as c:
+            return await c.post(
+                Config.org_url('agent-runs/execute-task/'), body,
             )
 
     @mcp.tool()
