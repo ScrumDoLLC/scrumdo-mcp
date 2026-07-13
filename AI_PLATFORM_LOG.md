@@ -137,6 +137,43 @@ signatures per spec §13.3).
   PATCH handler reconciles to whatever the current format is. JSON
   merge patch semantics (e.g. null = delete) are NOT yet enforced.
 
+## Card AI Cockpit Bridge — Slice 1 (2026-07-13, v0.3.0)
+
+Per `AI_COCKPIT_BRIDGE_SPEC.md` (this repo), derived from
+`MassSense/docs/SCRUMDO_MCP_AI_COCKPIT_WRITE_SPEC.md` + a route map verified
+directly against `apps/api_v4` on 2026-07-13.
+
+Slice 1 (read + discovery, no backend change) — new module
+`spryng_mcp/tools/cockpit.py`, +3 tools (93 → 96):
+
+- `get_card_cockpit_context(card_ref, include?)` → `GET stories/<id>/ai-cockpit/`
+  (`StoryAiCockpitHandler`). The cockpit's own aggregate in one call: spec,
+  configured agents + runtimes w/ per-card readiness, permissions, available
+  actions, loops, recent runs. Compact by default (drops the ≤50-row `messages`
+  + `agent_profiles` blob unless `include=["all"]` or named).
+- `get_effective_governance(card_ref, agent_profile_id?)` →
+  `GET stories/<id>/agent-commands/` (`StoryAgentCommandsHandler`). The
+  server-authoritative command policy (enabled/disabled + reason, risk,
+  requires_human, dispatch_kind) + deciding `policy_source`. Story-scoped.
+- `get_mcp_capabilities()` — network-free connection context + full tool
+  registry enumeration (install/smoke aid). Per-card enforcement delegated to
+  `get_effective_governance`.
+
+Hardened `get_agent_identity()` — tolerates the `agents/whoami/` **404** (an
+org/human token, not an agent) instead of raising; adds `token_mode`
+(`run_scoped`|`agent`|`org_or_human`), `organization`, `project`, `run_context`,
+`writes_permitted`. This is load-bearing for the human-only cockpit writes in
+Slice 2 (the human-principal client mode, spec §4.1).
+
+Tests: `tests/test_cockpit_tools.py` (7) — default/all/explicit `include`
+selection, governance passthrough + param, capabilities registry+config, and
+both whoami paths (agent 200 + human 404). Suite 40 passed.
+
+Remaining (spec §6-7): Slice 2 human-principal client mode + attribution +
+chat/draft-from-card + multi-doc spec ergonomics; Slice 3 typed
+outcome/QA/evidence wrappers + execute-task + MCP-Workbench `confirm_token`
+handshake for accept.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the

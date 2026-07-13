@@ -32,6 +32,7 @@ from .tools import (
     blockers,
     boards,
     cards,
+    cockpit,
     comments,
     fields,
     github,
@@ -81,6 +82,16 @@ Key conventions for this project:
 
 Use log_activity() to record agent actions against cards so the workspace
 activity log stays current and filterable.
+
+Card AI Cockpit bridge:
+  To understand a card in one shot, call get_card_cockpit_context(card_ref) —
+  it returns the cockpit's own aggregate (spec, configured agents + runtimes with
+  per-card readiness, your permissions, available actions, active loops, and
+  recent runs) rather than making you stitch five narrow reads together. Before
+  attempting a governed write, call get_effective_governance(card_ref) to see the
+  server-authoritative command policy (what's enabled/disabled and why, risk, and
+  whether it's human-only). get_mcp_capabilities() lists the whole tool surface +
+  connection context (a network-free smoke check).
 
 Spec proposals — the reviewed alternative to editing the spec directly:
   generate_spec_proposal / list_spec_proposals / accept_spec_proposal /
@@ -151,6 +162,9 @@ agent_runs.register(mcp)
 loops.register(mcp)
 # Phase G (BOARD_AI_AGENTS_UNIFIED_SPEC §10) — AI intelligence tools.
 intelligence.register(mcp)
+# Card AI Cockpit bridge (AI_COCKPIT_BRIDGE_SPEC.md Slice 1) — cockpit-shaped
+# read + governance/capability discovery.
+cockpit.register(mcp)
 
 
 # ── Entrypoint ─────────────────────────────────────────────────────────────────
