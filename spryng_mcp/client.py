@@ -17,7 +17,8 @@ class SpryngClient:
     """
 
     def __init__(self, *, agent_run_id: str | None = None,
-                 loop_id: str | None = None) -> None:
+                 loop_id: str | None = None,
+                 human_principal: bool = False) -> None:
         # Per BOARD_AI_AGENTS_UNIFIED_SPEC §13.2 — propagate the active
         # AgentRun id on every outbound request when the token is run-scoped.
         # Explicit ctor arg wins; otherwise fall back to Config.agent_run_id.
@@ -25,11 +26,26 @@ class SpryngClient:
         # GOVERNED_AGENT_LOOPS_SPEC §4 — loop correlation header.
         lp_id = (loop_id or Config.loop_id or "").strip()
 
+        # AI_COCKPIT_BRIDGE_SPEC.md §4.1 — human-principal mode. The backend's
+        # assert_human_actor treats ANY request carrying X-Spryng-Agent-Run as an
+        # agent and 403s the human-only cockpit actions (chat, draft-from-card,
+        # execute-task, loop start/steer, proposal accept/reject). A human-principal
+        # client therefore suppresses the run + loop headers regardless of env, so
+        # the request is attributed to the token's own (human/org) identity.
+        if human_principal:
+            run_id = ""
+            lp_id = ""
+
         headers: dict[str, str] = {
             "Authorization": f"Bearer {Config.token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            # §4.3 — write attribution (ignore-safe if the backend doesn't read it).
+            "X-Spryng-Source": "mcp",
+            "X-Spryng-Client": Config.client_name or "mcp",
         }
+        if Config.client_version:
+            headers["X-Spryng-Client-Version"] = Config.client_version
         if run_id:
             headers["X-Spryng-Agent-Run"] = run_id
         if lp_id:
@@ -40,6 +56,7 @@ class SpryngClient:
             timeout=30.0,
         )
         self._agent_run_id: str = run_id
+        self._human_principal: bool = human_principal
         # Cache: human-readable card ref (e.g. "ON-914") → numeric story id
         self._card_id_cache: dict[str, int] = {}
 
@@ -47,6 +64,12 @@ class SpryngClient:
     def agent_run_id(self) -> str:
         """The active AgentRun id propagated on every write, if any."""
         return self._agent_run_id
+
+    @property
+    def human_principal(self) -> bool:
+        """True when this client suppresses the run/loop headers so the backend
+        attributes writes to the token's own (human/org) identity (spec §4.1)."""
+        return self._human_principal
 
     async def __aenter__(self) -> "SpryngClient":
         return self

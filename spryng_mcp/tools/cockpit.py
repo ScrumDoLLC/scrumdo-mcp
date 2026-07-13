@@ -172,3 +172,101 @@ def register(mcp: FastMCP) -> None:
                 "and get_agent_identity() for token mode + write eligibility."
             ),
         }
+
+    # ── Slice 2: human-principal cockpit writes ─────────────────────────────
+    #
+    # These are HUMAN-ONLY cockpit actions — the backend's assert_human_actor
+    # refuses any request carrying X-Spryng-Agent-Run. They run on a
+    # human-principal client (spec §4.1) which suppresses the run/loop headers, so
+    # they act as the token's own identity. A genuine agent token is still
+    # refused server-side (you cannot fake a human); use the agent-run tools
+    # (report_agent_progress, …) for agent work.
+
+    @mcp.tool()
+    async def send_cockpit_chat(
+        card_ref: str,
+        message: str,
+        agent_profile_id: int | None = None,
+        media_ids: list[int] | None = None,
+        scope_ref: dict | None = None,
+    ) -> dict:
+        """Post a message into a card's AI Cockpit chat (human-only).
+
+        Saves a governed card message and — when `agent_profile_id` is given and
+        `message` is non-empty — dispatches a governed `kind='chat'` agent run whose
+        reply posts back into the same cockpit timeline. This is the "talk to a
+        board agent on this card" path; to work a card AS an agent, use the
+        agent-run tools instead.
+
+        Human-only: runs as a human principal (the run/loop headers are suppressed).
+        A run-scoped / agent token is refused by the backend.
+
+        Returns `{message, chat_run_id}` (chat_run_id is null when no run was
+        dispatched). Raises 409 `chat_in_progress` if a run is already active on the
+        card — wait for it (poll get_card_cockpit_context) and retry.
+
+        Args:
+            card_ref: 'ON-914'-style reference.
+            message: The chat body (markdown).
+            agent_profile_id: Which agent to dispatch the reply to. Omit to post the
+                message without starting an agent run.
+            media_ids: Optional governed-media ids to attach.
+            scope_ref: Optional `{type, id?}` scoping the message to a sub-object.
+        """
+        body: dict = {"action": "message", "body": message}
+        if agent_profile_id is not None:
+            body["agent_profile_id"] = agent_profile_id
+        if media_ids:
+            body["media_ids"] = list(media_ids)
+        if scope_ref:
+            body["scope_ref"] = scope_ref
+        async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            return await c.post(
+                Config.project_url(f"stories/{story_id}/ai-cockpit/"), body)
+
+    @mcp.tool()
+    async def draft_spec_from_card(
+        card_ref: str,
+        doc_type: str = "requirements",
+        instructions: str = "",
+        card_fields: list[str] | None = None,
+        agent_profile_id: int | None = None,
+        context_selection: dict | None = None,
+    ) -> dict:
+        """Ask an agent to draft a spec document from the card (human-only).
+
+        This is the Card AI Cockpit's own doc-type-aware draft path (distinct from
+        generate_spec_proposal, which is the Docs-panel proposal flow). It dispatches
+        an agent to draft the given `doc_type` and returns the run + the pending
+        proposal; poll list_spec_proposals(card_ref) for it to leave `generating`,
+        then review with accept/reject/request-changes.
+
+        Human-only: runs as a human principal. A run-scoped / agent token is refused.
+
+        Args:
+            card_ref: 'ON-914'-style reference.
+            doc_type: Which spec document to draft (e.g. 'requirements', 'design',
+                'test'). Defaults to 'requirements'.
+            instructions: Free-text guidance for the draft (≤4000 chars).
+            card_fields: Custom-field names to spotlight in the agent's context.
+            agent_profile_id: Which agent drafts. Defaults to the card's configured
+                agent.
+            context_selection: Optional structured context selector (advanced).
+
+        Returns `{run, proposal, runner_readiness}`. 409 `draft_not_started` /
+        `runner_not_configured` if no runnable agent is available.
+        """
+        body: dict = {"action": "draft_spec_from_card", "doc_type": doc_type}
+        if instructions:
+            body["instructions"] = instructions
+        if card_fields:
+            body["card_fields"] = list(card_fields)
+        if agent_profile_id is not None:
+            body["agent_profile_id"] = agent_profile_id
+        if context_selection is not None:
+            body["context_selection"] = context_selection
+        async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            return await c.post(
+                Config.project_url(f"stories/{story_id}/ai-cockpit/"), body)

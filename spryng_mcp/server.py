@@ -92,6 +92,12 @@ Card AI Cockpit bridge:
   server-authoritative command policy (what's enabled/disabled and why, risk, and
   whether it's human-only). get_mcp_capabilities() lists the whole tool surface +
   connection context (a network-free smoke check).
+  To talk to a board agent on a card, use send_cockpit_chat(card_ref, message,
+  agent_profile_id) — its reply posts back into the cockpit timeline. To have an
+  agent draft a spec document, use draft_spec_from_card(card_ref, doc_type=...).
+  Both are HUMAN-ONLY: they run as a human principal (the run header is dropped),
+  so a run-scoped agent token is refused — use the agent-run tools to work a card
+  as an agent.
 
 Spec proposals — the reviewed alternative to editing the spec directly:
   generate_spec_proposal / list_spec_proposals / accept_spec_proposal /

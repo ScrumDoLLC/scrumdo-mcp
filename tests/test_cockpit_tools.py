@@ -5,12 +5,15 @@ Mirrors tests/test_spec_proposal_tools.py.
 """
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
 from httpx import Response
 from mcp.server.fastmcp import FastMCP
 
+from spryng_mcp.client import SpryngClient
 from spryng_mcp.config import Config
 from spryng_mcp.tools import agents, cockpit
 
@@ -150,3 +153,69 @@ async def test_agent_identity_human_token_whoami_404_is_graceful():
     assert result["is_agent"] is False
     assert result["token_mode"] == "org_or_human"
     assert result["current_run_id"] is None
+
+
+# ── Slice 2: human-principal client mode + attribution ──────────────────────
+
+@pytest.mark.asyncio
+async def test_human_principal_suppresses_run_and_loop_headers(monkeypatch):
+    monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    monkeypatch.setattr(Config, "loop_id", "loop-7")
+    # Default client propagates the run/loop headers…
+    async with SpryngClient() as default:
+        assert default._http.headers.get("x-spryng-agent-run") == "run-99"
+        assert default._http.headers.get("x-spryng-loop") == "loop-7"
+    # …human-principal client drops them so assert_human_actor accepts the caller.
+    async with SpryngClient(human_principal=True) as human:
+        assert "x-spryng-agent-run" not in human._http.headers
+        assert "x-spryng-loop" not in human._http.headers
+        assert human.human_principal is True
+        # Attribution rides on every request regardless of mode.
+        assert human._http.headers.get("x-spryng-source") == "mcp"
+        assert human._http.headers.get("x-spryng-client")
+
+
+# ── send_cockpit_chat / draft_spec_from_card ────────────────────────────────
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_send_cockpit_chat_posts_message_as_human(monkeypatch):
+    # Even with a run id in the env, the chat write must go out WITHOUT the run
+    # header (proving it uses the human-principal client).
+    monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    _mock_card_resolution()
+    route = respx.post(
+        Config.project_url(f"stories/{CARD_ID}/ai-cockpit/")
+    ).mock(return_value=Response(201, json={"message": {"id": 5}, "chat_run_id": 77}))
+    result = await _tool(cockpit, "send_cockpit_chat")(
+        card_ref="ON-914", message="please review", agent_profile_id=3)
+
+    body = json.loads(route.calls.last.request.content)
+    assert body == {"action": "message", "body": "please review",
+                    "agent_profile_id": 3}
+    assert "x-spryng-agent-run" not in route.calls.last.request.headers
+    assert route.calls.last.request.headers.get("x-spryng-source") == "mcp"
+    assert result["chat_run_id"] == 77
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_draft_spec_from_card_posts_action_doc_type_and_fields():
+    _mock_card_resolution()
+    route = respx.post(
+        Config.project_url(f"stories/{CARD_ID}/ai-cockpit/")
+    ).mock(return_value=Response(201, json={
+        "run": {"id": 9, "kind": "draft_spec"},
+        "proposal": {"id": "p-1", "status": "generating"},
+        "runner_readiness": {"ready": True}}))
+    result = await _tool(cockpit, "draft_spec_from_card")(
+        card_ref="ON-914", doc_type="design",
+        instructions="cover the retry path", card_fields=["class_of_service"])
+
+    body = json.loads(route.calls.last.request.content)
+    assert body == {
+        "action": "draft_spec_from_card", "doc_type": "design",
+        "instructions": "cover the retry path",
+        "card_fields": ["class_of_service"],
+    }
+    assert result["proposal"]["status"] == "generating"

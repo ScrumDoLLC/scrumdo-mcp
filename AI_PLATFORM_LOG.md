@@ -169,10 +169,35 @@ Tests: `tests/test_cockpit_tools.py` (7) — default/all/explicit `include`
 selection, governance passthrough + param, capabilities registry+config, and
 both whoami paths (agent 200 + human 404). Suite 40 passed.
 
-Remaining (spec §6-7): Slice 2 human-principal client mode + attribution +
-chat/draft-from-card + multi-doc spec ergonomics; Slice 3 typed
-outcome/QA/evidence wrappers + execute-task + MCP-Workbench `confirm_token`
-handshake for accept.
+## Card AI Cockpit Bridge — Slice 2 (2026-07-13, v0.3.1)
+
+Human-principal writes + attribution — +2 tools (96 → 98):
+
+- `SpryngClient(human_principal=True)` (`client.py`) suppresses the
+  `X-Spryng-Agent-Run` + `X-Spryng-Loop` headers regardless of env, so the
+  human-only cockpit actions are attributed to the token's own identity —
+  `assert_human_actor` 403s any request carrying the run header (spec §4.1).
+- Write attribution (spec §4.3): every request now carries `X-Spryng-Source: mcp`
+  + `X-Spryng-Client: <SCRUMDO_CLIENT_NAME>` (default `mcp`) + optional
+  `X-Spryng-Client-Version` (ignore-safe if the backend doesn't read them).
+- `send_cockpit_chat(card_ref, message, agent_profile_id?, media_ids?, scope_ref?)`
+  → `POST stories/<id>/ai-cockpit/` `{action:"message"}` — posts a governed card
+  message and dispatches a `kind='chat'` run whose reply lands in the cockpit
+  timeline. Human-only. 409 `chat_in_progress` when a run is active.
+- `draft_spec_from_card(card_ref, doc_type="requirements", instructions?,
+  card_fields?, agent_profile_id?, context_selection?)` → `POST
+  stories/<id>/ai-cockpit/` `{action:"draft_spec_from_card"}` — the cockpit's own
+  doc-type-aware draft path (returns `{run, proposal, runner_readiness}`).
+  Human-only.
+
+Tests: +3 in `tests/test_cockpit_tools.py` — human-principal header suppression
+(even with a run id in env) + attribution presence; chat posts as human
+(no run header on the write); draft posts action+doc_type+fields. Suite 43 passed.
+
+Remaining (spec §7): Slice 3 typed outcome/QA/evidence wrappers
+(`accept_proof`, `request_agent_replan`, `report_agent_verification`,
+`report_agent_outcome`) + `execute_task` + multi-doc spec `doc_type` ergonomics +
+MCP-Workbench `confirm_token` handshake for proposal accept.
 
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 

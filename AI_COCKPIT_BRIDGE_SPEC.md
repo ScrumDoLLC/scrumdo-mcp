@@ -1,6 +1,6 @@
 # scrumdo-mcp — AI Cockpit Bridge Spec
 
-Status: Execution-ready (Slice 1 in progress)
+Status: Slices 1–2 shipped (v0.3.1, 98 tools); Slice 3 remaining.
 Date: 2026-07-13
 Baseline: `scrumdo-mcp` v0.2.13, 93 tools, branch `feat/ai-cockpit-bridge`.
 

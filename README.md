@@ -123,7 +123,7 @@ Once connected, just talk to your AI tool naturally:
 
 ---
 
-## Available tools (96 total)
+## Available tools (98 total)
 
 | Group | Tools |
 |-------|-------|
@@ -142,7 +142,7 @@ Once connected, just talk to your AI tool naturally:
 | **Spec** | `get_card_spec`, `set_card_spec`, `patch_card_spec`, `get_spec_history` |
 | **Spec proposals** | `generate_spec_proposal`, `list_spec_proposals`, `accept_spec_proposal`, `reject_spec_proposal`, `request_spec_proposal_changes`, `revise_spec_proposal` — all six are human-only; an agent-flagged token is rejected on every one |
 | **GitHub** | `get_github_repos`, `list_card_github_links`, `link_github_pr`, `link_github_commit`, `link_github_issue` |
-| **Cockpit** | `get_card_cockpit_context`, `get_effective_governance`, `get_mcp_capabilities` — the Card AI Cockpit bridge: one-call card context, the governed command policy for a card, and this bridge's own tool/connection surface |
+| **Cockpit** | `get_card_cockpit_context`, `get_effective_governance`, `get_mcp_capabilities`, `send_cockpit_chat`, `draft_spec_from_card` — the Card AI Cockpit bridge: one-call card context, the governed command policy for a card, this bridge's own tool/connection surface, plus human-only cockpit writes (chat a board agent, draft a spec doc). MCP writes are attributed to the cockpit timeline via `X-Spryng-Source: mcp` |
 | **Agents** | `get_agent_identity`, `list_agent_accounts` |
 | **Agent runs** | `start_agent_run`, `get_agent_run`, `list_agent_runs`, `approve_agent_plan`, `report_agent_progress`, `cancel_agent_run` |
 | **Loops & verification** | `start_loop`, `start_verification_loop`, `get_loop_status`, `list_active_loops`, `pause_loop`, `resume_loop`, `cancel_loop`, `get_loop_state`, `update_loop_state`, `get_verification_status`, `run_verifier`, `verify_card`, `log_loop_step`, `attach_evidence`, `route_to_agent`, `list_skills`, `load_skill` |
@@ -166,6 +166,7 @@ tools default to that loop, so `loop_id` is optional.
 | `SCRUMDO_ORG` | — | Your organization slug |
 | `SCRUMDO_PROJECT` | — | Default project slug |
 | `SCRUMDO_AGENT_RUN_ID` | — | Optional. AI Agent run id this MCP is driving. When set, every write sends the `X-Spryng-Agent-Run` header so the run's audit trail attributes the write (`change_source='agent_run'`). Requires `SCRUMDO_TOKEN` to be that agent's own token, and the run to belong to it. |
+| `SCRUMDO_CLIENT_NAME` | `mcp` | Optional. The host tool driving this bridge (`codex` / `claude-code` / `cursor`). Sent as `X-Spryng-Client` alongside `X-Spryng-Source: mcp` so the Card AI Cockpit timeline can show "via MCP (<client>)". (`SPRYNG_CLIENT_NAME` accepted as an alias; `SCRUMDO_CLIENT_VERSION` optionally adds a version.) |
 | `SPRYNG_LOOP_ID` | — | Optional. The governed loop this MCP is running inside. When set, writes carry the `X-Spryng-Loop` header (attributed to the loop's timeline) and the loop-scoped tools (`log_loop_step`, `attach_evidence`, `get_verification_status`) default their `loop_id` to it — so in-loop agents call them without an id. (`SCRUMDO_LOOP_ID` is accepted as an alias.) |
 
 ---
