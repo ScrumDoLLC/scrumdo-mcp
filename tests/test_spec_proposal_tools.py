@@ -132,3 +132,59 @@ async def test_revise_spec_proposal_posts_to_revise_not_reject():
     body = json.loads(route.calls.last.request.content)
     assert body == {"repo_full_name": "acme/widgets"}
     assert result["previous_proposal_id"] == "abc-123"
+
+
+# ── Slice 3b: MCP Workbench confirm_token gate ──────────────────────────────
+
+PROPOSAL_UUID = "abc-123"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_accept_forwards_confirm_token_and_runs_as_human(monkeypatch):
+    # A run id in the env must NOT ride on this human-only decision.
+    monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    _mock_card_resolution()
+    route = respx.post(
+        Config.project_url(f"stories/{CARD_ID}/spec-proposals/{PROPOSAL_UUID}/accept/")
+    ).mock(return_value=Response(200, json={"status": "accepted"}))
+    await _tool("accept_spec_proposal")(
+        card_ref="ON-914", proposal_id=PROPOSAL_UUID, confirm_token="ct-1")
+
+    assert json.loads(route.calls.last.request.content) == {"confirm_token": "ct-1"}
+    assert "x-spryng-agent-run" not in route.calls.last.request.headers
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_preview_spec_decision_posts_action_and_returns_token():
+    route = respx.post(
+        Config.org_url(f"workbench/proposals/{PROPOSAL_UUID}/preview-decision/")
+    ).mock(return_value=Response(200, json={
+        "action": "accept", "confirm_token": "ct-xyz",
+        "expires_in_seconds": 600, "gate": {"stale": False}}))
+    result = await _tool("preview_spec_decision")(
+        proposal_id=PROPOSAL_UUID, action="accept")
+
+    assert json.loads(route.calls.last.request.content) == {"action": "accept"}
+    assert result["confirm_token"] == "ct-xyz"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_decision_inbox():
+    respx.get(Config.org_url("decision-inbox/")).mock(
+        return_value=Response(200, json={"items": [{"proposal_id": PROPOSAL_UUID}]}))
+    result = await _tool("get_decision_inbox")()
+    assert result["items"][0]["proposal_id"] == PROPOSAL_UUID
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_attest_spec_understood_posts_empty_body():
+    route = respx.post(
+        Config.org_url(f"workbench/proposals/{PROPOSAL_UUID}/understood/")
+    ).mock(return_value=Response(200, json={"understood": True}))
+    result = await _tool("attest_spec_understood")(proposal_id=PROPOSAL_UUID)
+    assert json.loads(route.calls.last.request.content) == {}
+    assert result["understood"] is True

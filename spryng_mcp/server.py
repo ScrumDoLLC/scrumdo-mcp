@@ -110,6 +110,11 @@ Spec proposals — the reviewed alternative to editing the spec directly:
   (subject to the frontmatter whitelist in step 3 below). accept_spec_proposal
   can trigger an execution run if the room has a runnable profile — it is a
   real "make this official" action, not a passive review note.
+  MCP decide gate: from an MCP session the backend requires a confirm_token to
+  accept/reject/request-changes on a proposal. Flow: get_decision_inbox() →
+  preview_spec_decision(proposal_id, action) to mint the token (bound to the
+  proposal's current version, 10-min TTL) → accept_spec_proposal(...,
+  confirm_token=<token>).
 
 If you are running as an AI agent (BOARD_AI_AGENTS_UNIFIED_SPEC §13.4):
   1. Call get_agent_identity() first; capture current_run_id.

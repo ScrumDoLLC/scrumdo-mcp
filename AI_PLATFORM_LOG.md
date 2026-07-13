@@ -231,6 +231,40 @@ Deferred to Slice 3b (contracts need real wiring, not guessed): the MCP-Workbenc
 param on `get/set/patch_card_spec` (the spec handler's `doc_type` support is on the
 finalize path only today — needs a per-method read before exposing).
 
+## Card AI Cockpit Bridge — Slice 3b (2026-07-13, v0.3.3)
+
+MCP-Workbench decide gate — +3 tools (101 → 104), contracts verified against
+`apps/mcp_workbench/handlers.py` + `confirm_tokens.py`:
+
+- `get_decision_inbox()` → `GET organizations/<org>/decision-inbox/`
+  (`DecisionInboxHandler`). What's awaiting your human decision.
+- `preview_spec_decision(proposal_id, action)` →
+  `POST organizations/<org>/workbench/proposals/<uuid>/preview-decision/`
+  (`WbPreviewDecisionHandler`). The unskippable consequence preview and the ONLY
+  source of a `confirm_token`, bound to (user, proposal, current `target_hash`,
+  action) with a 10-min TTL. Returns `{action, descriptors, gate, confirm_token,
+  expires_in_seconds, decide, web_path}`.
+- `attest_spec_understood(proposal_id)` →
+  `POST workbench/proposals/<uuid>/understood/` (`WbProposalUnderstoodHandler`).
+
+Threaded an optional `confirm_token` into `accept_spec_proposal` /
+`reject_spec_proposal` / `request_spec_proposal_changes` (the backend's
+`_require_mcp_confirm_token` demands it from an MCP session — accept was
+previously unreachable from MCP) and hardened those three to run as a human
+principal. The gate flow: get_decision_inbox → (understood) → preview_spec_decision
+→ accept with the token; a token minted against a since-changed proposal is
+rejected, forcing a fresh preview.
+
+Tests: +4 in `tests/test_spec_proposal_tools.py` — confirm_token forwarding +
+human-principal on accept, preview mints/returns the token, inbox read, understood.
+Suite 52 passed. Existing accept-empty-body / reject-no-request-changes tests still
+pass (confirm_token is only added to the body when supplied).
+
+Still deferred: multi-doc `doc_type` on `get/set/patch_card_spec` — the primary
+spec GET/POST/PATCH don't read `doc_type` (only the finalize handler does), so
+doc-typed read/write needs its own doc-spec endpoint contract, not a param add.
+Drafting is already doc-type-aware via `draft_spec_from_card`.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the
