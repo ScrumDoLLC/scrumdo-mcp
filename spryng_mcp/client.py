@@ -244,7 +244,10 @@ class SpryngClient:
 
     async def update_task(self, card_ref: str, task_id: int, body: dict[str, Any]) -> dict:
         story_id = await self._resolve_card_id(card_ref)
-        return await self.patch(Config.project_url(f"stories/{story_id}/tasks/{task_id}/"), body)
+        # Production TaskHandler implements PUT (not PATCH) for task updates, so
+        # PATCH 405s until commit cb25edcd94 deploys. PUT hits the same partial-
+        # update path (complete / summary / status / ... via update_task_data).
+        return await self.put(Config.project_url(f"stories/{story_id}/tasks/{task_id}/"), body)
 
     async def delete_task(self, card_ref: str, task_id: int) -> int:
         story_id = await self._resolve_card_id(card_ref)

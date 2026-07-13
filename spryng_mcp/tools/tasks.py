@@ -75,9 +75,10 @@ def register(mcp: FastMCP) -> None:
         description: str | None = None,
         complete: bool | None = None,
         assignee_id: int | None = None,
+        status: int | None = None,
     ) -> dict:
         """
-        Update a task's description, completion state, or assignee.
+        Update a task's description, completion state, assignee, or status.
 
         Args:
             card_ref:    Card reference, e.g. 'ON-914'.
@@ -85,6 +86,9 @@ def register(mcp: FastMCP) -> None:
             description: New description (leave None to keep current).
             complete:    True to complete, False to reopen.
             assignee_id: New assignee user id.
+            status:      Workflow status 1-10 (e.g. 1=To Do, 7=Reviewing,
+                         10=Done). Sets the task's status column directly;
+                         use this to move a task into "Reviewing" (7).
         """
         body: dict = {}
         if description is not None:
@@ -93,6 +97,8 @@ def register(mcp: FastMCP) -> None:
             body["complete"] = complete
         if assignee_id is not None:
             body["assignee"] = assignee_id
+        if status is not None:
+            body["status"] = int(status)
         async with SpryngClient() as c:
             return await c.update_task(card_ref, task_id, body)
 
