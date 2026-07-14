@@ -95,7 +95,8 @@ async def test_promote_action_url_and_scope_body():
         out = await c.blackboard_action("ON-914", 7, "promote",
                                         {"scope": "card"})
     assert out["claim"]["id"] == 91
-    assert b'"scope":"card"' in route.calls.last.request.content
+    import json as _json
+    assert _json.loads(route.calls.last.request.content) == {"scope": "card"}
 
 
 # ── Saved context (card + room) ───────────────────────────────────────────────
@@ -131,8 +132,9 @@ async def test_dispute_resolve_body_shapes():
         await c.resolve_memory_dispute(5, winner_id=11)   # pick a winner
         await c.resolve_memory_dispute(5)                 # dismiss
     first, second = route.calls[0].request, route.calls[1].request
-    assert b'"winner_id":11' in first.content
-    assert second.content in (b"{}", b"")
+    import json as _json
+    assert _json.loads(first.content) == {"winner_id": 11}
+    assert second.content in (b"{}", b"") or _json.loads(second.content) == {}
 
 
 # ── Notifications ─────────────────────────────────────────────────────────────
