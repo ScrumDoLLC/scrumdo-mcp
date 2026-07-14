@@ -33,6 +33,7 @@ from .tools import (
     boards,
     cards,
     cockpit,
+    commands,
     comments,
     fields,
     github,
@@ -101,6 +102,13 @@ Card AI Cockpit bridge:
   get_card_cockpit_context configured_agents[] entry (filter by can_chat /
   can_propose_spec); a chat reply lands in the card's `messages`
   (get_card_cockpit_context(..., include=["messages"])).
+  Every governed slash-command in the catalog (get_effective_governance) is
+  reachable: invoke_cockpit_command(card_ref, command_id, args?) runs the same
+  governed dispatcher the cockpit uses (executes loop.status/pause/resume +
+  skill.<slug>; governance-validates the rest). Typed tools cover the executable
+  actions — research_card, run_card_tests, tasks_from_spec, get_card_memory,
+  clear_card_memory — alongside draft_spec_from_card / accept_spec_proposal /
+  start_loop / start_agent_run / run_verifier already present.
 
 Spec proposals — the reviewed alternative to editing the spec directly:
   generate_spec_proposal / list_spec_proposals / accept_spec_proposal /
@@ -179,6 +187,9 @@ intelligence.register(mcp)
 # Card AI Cockpit bridge (AI_COCKPIT_BRIDGE_SPEC.md Slice 1) — cockpit-shaped
 # read + governance/capability discovery.
 cockpit.register(mcp)
+# Governed cockpit command catalog coverage — generic invoke + typed tools for
+# research / test.run / tasks / memory so every catalog command is reachable.
+commands.register(mcp)
 
 
 # ── Entrypoint ─────────────────────────────────────────────────────────────────

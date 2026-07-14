@@ -367,6 +367,39 @@ Test: +1 in `tests/test_run_context_header.py` (302 → clear error). Suite 59 p
 Committed on `fix/redirect-error-clarity`; not published — will ride the next release
 once the cockpit backend is deployed.
 
+## Card AI Cockpit Bridge — full command-catalog coverage (2026-07-14, v0.4.0)
+
+Made **every governed cockpit command reachable from the MCP**. The catalog
+(`get_effective_governance` → `agent-commands/`) has 22 static commands
+(spec.draft/review/approve/reject, loop.start/status/pause/resume, execute,
+verify.run, research, tasks, test.run, deploy.trigger, outcome.review/approve/reject,
+memory.status/clear, context, help) + dynamic `skill.<slug>`. Verified against
+`agent_commands.py`: the `invoke` endpoint EXECUTES `loop.status/pause/resume` +
+`skill.<slug>` and returns `validated` for the `cockpit_action` commands (the client
+runs the real action). New `tools/commands.py`, +6 tools (107 → 113):
+
+- `invoke_cockpit_command(card_ref, command_id, args?, agent_profile_id?)` →
+  `POST stories/<id>/agent-commands/invoke/` — the generic governed dispatcher for
+  ANY catalog command (incl. future ones + `skill.<slug>` + `deploy.trigger` +
+  `outcome.*`). Human-principal.
+- Typed execution tools filling the gaps (all human-only → human-principal), verified
+  against the handlers:
+  - `research_card(card_ref, brief, agent_id?)` → `agent-runs/research/`
+  - `run_card_tests(card_ref, test_command?, agent_id?)` → `agent-runs/test-run/`
+  - `tasks_from_spec(card_ref, spec_ref, agent_id?)` → `agent-runs/tasks-from-spec/`
+  - `get_card_memory(card_ref)` → `GET stories/<id>/memory/`
+  - `clear_card_memory(card_ref)` → `POST stories/<id>/memory/clear/`
+
+Full command → MCP tool map is documented in `tools/commands.py`. Coverage: spec.* →
+draft_spec_from_card/verify_card/accept/reject; loop.* → start_loop + loop tools;
+execute → start_agent_run; verify.run → run_verifier; research/tasks/test.run/memory.*
+→ the new tools; context → get_card_cockpit_context; help → get_effective_governance;
+skill.*/deploy.trigger/outcome.* → invoke_cockpit_command.
+
+Tests: `tests/test_command_tools.py` (6) — invoke posts+human-principal, and each
+typed tool's body/route. Suite 65 passed. Committed on
+`feat/cockpit-command-coverage` (off the redirect-fix branch); unreleased.
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the
