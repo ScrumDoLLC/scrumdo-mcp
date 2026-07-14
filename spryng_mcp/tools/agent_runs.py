@@ -28,14 +28,18 @@ def register(mcp: FastMCP) -> None:
 
         Args:
             card_ref: 'ON-914'-style reference.
-            agent_id: User id of the agent identity to run. Defaults to
-                      the (single) active agent currently assigned to
-                      the card.
+            agent_id: The agent's USER id — NOT the `agent_profile_id` used by
+                send_cockpit_chat / draft_spec_from_card. Find it as
+                `configured_agents[].user_id` in get_card_cockpit_context (or via
+                list_agent_accounts). Defaults to the card's active assigned agent.
         """
-        body: dict = {'card_ref': card_ref}
-        if agent_id is not None:
-            body['agent_id'] = agent_id
         async with SpryngClient(human_principal=True) as c:
+            # Send the resolved numeric card_id, not card_ref: the agent-runs
+            # endpoint's card_ref resolution errors on some backends.
+            story_id = await c._resolve_card_id(card_ref)
+            body: dict = {'card_id': story_id}
+            if agent_id is not None:
+                body['agent_id'] = agent_id
             return await c.post(Config.org_url('agent-runs/'), body)
 
     @mcp.tool()
