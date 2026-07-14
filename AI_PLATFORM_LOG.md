@@ -425,6 +425,18 @@ pushed** (`agent/…codex/28`, commit `a9c21bc`).
 Tests updated (card-resolution mocks + `card_id` assertions). Suite 65 passed.
 Committed on `fix/run-tool-contracts` (off main).
 
+## Card AI Cockpit Bridge — cockpit_help discovery tool (2026-07-14, v0.4.3)
+
++1 tool: **`cockpit_help()`** — a network-free reference the agent calls when a user
+asks "what can I do?" / "help" in Claude or Codex. Returns the full governed command
+catalog (all 22 static commands + dynamic `skill.<slug>`) with each command's `risk`
+(read|write|approval|destructive), `human` flag, and the MCP tool that runs it
+(`_COCKPIT_COMMANDS` in tools/commands.py). Server instructions point the agent at it.
+For per-card enabled/disabled decisions, get_effective_governance(card_ref) stays the
+authority. Test: +1 in test_command_tools.py (full-catalog assertion). Committed on
+`feat/cockpit-help` (off main, which had advanced to 0.4.2 with the concurrent
+memory + notifications tool modules).
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the
