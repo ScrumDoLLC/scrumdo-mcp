@@ -111,6 +111,10 @@ Card AI Cockpit bridge:
   actions — research_card, run_card_tests, tasks_from_spec, get_card_memory,
   clear_card_memory — alongside draft_spec_from_card / accept_spec_proposal /
   start_loop / start_agent_run / run_verifier already present.
+  When the user asks "what can I do", "help", or which cockpit commands exist,
+  call cockpit_help() — a network-free list of every governed command + the MCP
+  tool that runs it (use get_effective_governance(card_ref) for the per-card
+  enabled/disabled decisions).
 
 Spec proposals — the reviewed alternative to editing the spec directly:
   generate_spec_proposal / list_spec_proposals / accept_spec_proposal /

@@ -107,3 +107,18 @@ async def test_clear_card_memory_posts_as_human(monkeypatch):
     assert json.loads(route.calls.last.request.content) == {}
     assert "x-spryng-agent-run" not in route.calls.last.request.headers
     assert result["cleared"] is True
+
+
+@pytest.mark.asyncio
+async def test_cockpit_help_lists_full_catalog():
+    result = await _tool("cockpit_help")()
+    ids = {c["id"] for c in result["commands"]}
+    assert result["command_count"] == len(result["commands"]) >= 22
+    for cid in ("spec.draft", "spec.approve", "loop.start", "execute", "verify.run",
+                "research", "tasks", "test.run", "deploy.trigger", "outcome.review",
+                "memory.status", "memory.clear", "context", "help", "skill.<slug>"):
+        assert cid in ids, cid
+    # every command names the MCP tool that runs it, with risk + human flags
+    for c in result["commands"]:
+        assert c.get("mcp_tool") and c.get("risk") in ("read", "write", "approval", "destructive")
+        assert "human" in c

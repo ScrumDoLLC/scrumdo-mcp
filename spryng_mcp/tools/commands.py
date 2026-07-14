@@ -36,8 +36,64 @@ from mcp.server.fastmcp import FastMCP
 from ..client import SpryngClient
 from ..config import Config
 
+# The governed Card AI Cockpit command catalog (mirrors the backend COMMAND_DEFS)
+# with the MCP tool that runs each — the reference cockpit_help() returns. `risk`:
+# read | write | approval | destructive. `human`: requires a human actor.
+_COCKPIT_COMMANDS: list[dict] = [
+    {"id": "spec.draft",      "group": "spec",    "risk": "write",       "human": False, "desc": "Author a spec proposal",                 "mcp_tool": "draft_spec_from_card"},
+    {"id": "spec.review",     "group": "spec",    "risk": "write",       "human": False, "desc": "QA-review the current spec",             "mcp_tool": "verify_card"},
+    {"id": "spec.approve",    "group": "spec",    "risk": "approval",    "human": True,  "desc": "Accept the pending proposal",            "mcp_tool": "accept_spec_proposal"},
+    {"id": "spec.reject",     "group": "spec",    "risk": "approval",    "human": True,  "desc": "Reject the pending proposal",            "mcp_tool": "reject_spec_proposal"},
+    {"id": "loop.start",      "group": "loop",    "risk": "write",       "human": False, "desc": "Start a governed work loop",             "mcp_tool": "start_loop"},
+    {"id": "loop.status",     "group": "loop",    "risk": "read",        "human": False, "desc": "Summarize the active loop",              "mcp_tool": "get_loop_status | invoke_cockpit_command"},
+    {"id": "loop.pause",      "group": "loop",    "risk": "write",       "human": False, "desc": "Pause the running loop",                 "mcp_tool": "pause_loop | invoke_cockpit_command"},
+    {"id": "loop.resume",     "group": "loop",    "risk": "write",       "human": False, "desc": "Resume a paused/escalated loop",         "mcp_tool": "resume_loop | invoke_cockpit_command"},
+    {"id": "execute",         "group": "execute", "risk": "write",       "human": False, "desc": "Start an implementation run",            "mcp_tool": "start_agent_run"},
+    {"id": "verify.run",      "group": "verify",  "risk": "write",       "human": False, "desc": "QA-verify the latest run",               "mcp_tool": "run_verifier"},
+    {"id": "research",        "group": "research","risk": "write",       "human": False, "desc": "Read-only research pass on the card",     "mcp_tool": "research_card"},
+    {"id": "tasks",           "group": "tasks",   "risk": "write",       "human": False, "desc": "Turn a spec doc's items into tasks",      "mcp_tool": "tasks_from_spec"},
+    {"id": "test.run",        "group": "test",    "risk": "write",       "human": False, "desc": "Run the card's test suite",              "mcp_tool": "run_card_tests"},
+    {"id": "deploy.trigger",  "group": "deploy",  "risk": "destructive", "human": True,  "desc": "Trigger a governed deployment",          "mcp_tool": "invoke_cockpit_command"},
+    {"id": "outcome.review",  "group": "outcome", "risk": "approval",    "human": True,  "desc": "Send the outcome for review",            "mcp_tool": "invoke_cockpit_command"},
+    {"id": "outcome.approve", "group": "outcome", "risk": "approval",    "human": True,  "desc": "Accept the outcome",                     "mcp_tool": "invoke_cockpit_command"},
+    {"id": "outcome.reject",  "group": "outcome", "risk": "approval",    "human": True,  "desc": "Request changes on the outcome",         "mcp_tool": "invoke_cockpit_command"},
+    {"id": "memory.status",   "group": "memory",  "risk": "read",        "human": False, "desc": "Counts, quota, Cognee status",           "mcp_tool": "get_card_memory"},
+    {"id": "memory.clear",    "group": "memory",  "risk": "destructive", "human": True,  "desc": "Retire this card's memory",              "mcp_tool": "clear_card_memory"},
+    {"id": "context",         "group": "context", "risk": "read",        "human": False, "desc": "What context the agent will use",         "mcp_tool": "get_card_cockpit_context"},
+    {"id": "help",            "group": "help",    "risk": "read",        "human": False, "desc": "List commands",                          "mcp_tool": "cockpit_help | get_effective_governance"},
+    {"id": "skill.<slug>",    "group": "skill",   "risk": "write",       "human": False, "desc": "Inject a governed skill into a chat run", "mcp_tool": "invoke_cockpit_command"},
+]
+
 
 def register(mcp: FastMCP) -> None:
+
+    @mcp.tool()
+    async def cockpit_help() -> dict:
+        """List every governed Card AI Cockpit command and the MCP tool that runs it.
+
+        A network-free reference — call this when the user asks "what can I do?",
+        "help", or "which cockpit commands are available?". Returns the full catalog
+        (spec / loop / execute / verify / research / tasks / test / deploy / outcome
+        / memory / context / help + dynamic skill.<slug>), each with its risk level,
+        whether it needs a human, and the typed MCP tool (or invoke_cockpit_command)
+        that executes it.
+
+        For the per-card ENABLED/disabled decisions (governance scored for the
+        current token + agent), call get_effective_governance(card_ref). To run any
+        command generically, use invoke_cockpit_command(card_ref, command_id).
+        """
+        return {
+            "command_count": len(_COCKPIT_COMMANDS),
+            "commands": _COCKPIT_COMMANDS,
+            "generic_dispatch": "invoke_cockpit_command(card_ref, command_id, args?, agent_profile_id?)",
+            "per_card_policy": "get_effective_governance(card_ref) — enabled/disabled + reason, scored for the caller",
+            "note": (
+                "Every command is reachable from the MCP: the typed tool executes it; "
+                "invoke_cockpit_command dispatches loop.status/pause/resume + skill.<slug> "
+                "directly and governance-validates the rest. risk: read|write|approval|"
+                "destructive; human=True means a human actor is required."
+            ),
+        }
 
     @mcp.tool()
     async def invoke_cockpit_command(
