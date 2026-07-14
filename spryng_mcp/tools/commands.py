@@ -98,12 +98,15 @@ def register(mcp: FastMCP) -> None:
         Args:
             card_ref: 'ON-914'-style reference.
             brief: What to research (the question / scope).
-            agent_id: Which agent runs it. Defaults to a suitable agent.
+            agent_id: The agent's USER id (configured_agents[].user_id from
+                get_card_cockpit_context), NOT the agent_profile_id. Defaults to a
+                suitable agent.
         """
-        body: dict = {"card_ref": card_ref, "brief": brief}
-        if agent_id is not None:
-            body["agent_id"] = agent_id
         async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            body: dict = {"card_id": story_id, "brief": brief}
+            if agent_id is not None:
+                body["agent_id"] = agent_id
             return await c.post(Config.org_url("agent-runs/research/"), body)
 
     @mcp.tool()
@@ -121,14 +124,16 @@ def register(mcp: FastMCP) -> None:
             card_ref: 'ON-914'-style reference.
             test_command: Optional explicit command (e.g. 'pytest -q'); omit to use
                 the card/project default.
-            agent_id: Which agent runs it. Defaults to a suitable agent.
+            agent_id: The agent's USER id (configured_agents[].user_id), NOT the
+                agent_profile_id. Defaults to a suitable agent.
         """
-        body: dict = {"card_ref": card_ref}
-        if test_command:
-            body["test_command"] = test_command
-        if agent_id is not None:
-            body["agent_id"] = agent_id
         async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            body: dict = {"card_id": story_id}
+            if test_command:
+                body["test_command"] = test_command
+            if agent_id is not None:
+                body["agent_id"] = agent_id
             return await c.post(Config.org_url("agent-runs/test-run/"), body)
 
     @mcp.tool()
@@ -147,12 +152,14 @@ def register(mcp: FastMCP) -> None:
             card_ref: 'ON-914'-style reference.
             spec_ref: An `@spec://` reference to the doc whose items to extract
                 (e.g. '@spec://requirements').
-            agent_id: Which agent runs it. Defaults to a suitable agent.
+            agent_id: The agent's USER id (configured_agents[].user_id), NOT the
+                agent_profile_id. Defaults to a suitable agent.
         """
-        body: dict = {"card_ref": card_ref, "spec_ref": spec_ref}
-        if agent_id is not None:
-            body["agent_id"] = agent_id
         async with SpryngClient(human_principal=True) as c:
+            story_id = await c._resolve_card_id(card_ref)
+            body: dict = {"card_id": story_id, "spec_ref": spec_ref}
+            if agent_id is not None:
+                body["agent_id"] = agent_id
             return await c.post(
                 Config.org_url("agent-runs/tasks-from-spec/"), body)
 

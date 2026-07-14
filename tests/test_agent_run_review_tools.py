@@ -16,6 +16,15 @@ from mcp.server.fastmcp import FastMCP
 from spryng_mcp.config import Config
 from spryng_mcp.tools import agent_runs
 
+CARD_ID = 201582
+LIST_PAGE_STUB = {"items": [{"id": CARD_ID, "number": 914, "local_id": "ON-914"}],
+                  "next": None}
+
+
+def _mock_card_resolution() -> None:
+    respx.get(Config.project_url("stories/")).mock(
+        return_value=Response(200, json=LIST_PAGE_STUB))
+
 
 def _tool(name: str):
     m = FastMCP("test")
@@ -86,9 +95,12 @@ async def test_approve_agent_plan_runs_as_human(monkeypatch):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_start_agent_run_as_human(monkeypatch):
+async def test_start_agent_run_resolves_card_id_and_runs_as_human(monkeypatch):
     monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    _mock_card_resolution()
     route = respx.post(Config.org_url("agent-runs/")).mock(
         return_value=Response(201, json={"id": 5, "state": "queued"}))
     await _tool("start_agent_run")(card_ref="ON-914")
+    # Sends the resolved numeric card_id (not card_ref, which errors on the backend).
+    assert json.loads(route.calls.last.request.content) == {"card_id": CARD_ID}
     assert "x-spryng-agent-run" not in route.calls.last.request.headers

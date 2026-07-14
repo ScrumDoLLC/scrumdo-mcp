@@ -55,32 +55,35 @@ async def test_invoke_cockpit_command_posts_and_runs_as_human(monkeypatch):
 @pytest.mark.asyncio
 @respx.mock
 async def test_research_card_posts_brief():
+    _mock_card_resolution()
     route = respx.post(Config.org_url("agent-runs/research/")).mock(
         return_value=Response(201, json={"run": {"id": 9, "kind": "research"}}))
     await _tool("research_card")(card_ref="ON-914", brief="find the retry edge cases")
     assert json.loads(route.calls.last.request.content) == {
-        "card_ref": "ON-914", "brief": "find the retry edge cases"}
+        "card_id": CARD_ID, "brief": "find the retry edge cases"}
 
 
 @pytest.mark.asyncio
 @respx.mock
 async def test_run_card_tests_posts_command():
+    _mock_card_resolution()
     route = respx.post(Config.org_url("agent-runs/test-run/")).mock(
         return_value=Response(201, json={"run": {"id": 10, "kind": "test_run"}}))
     await _tool("run_card_tests")(card_ref="ON-914", test_command="pytest -q")
     assert json.loads(route.calls.last.request.content) == {
-        "card_ref": "ON-914", "test_command": "pytest -q"}
+        "card_id": CARD_ID, "test_command": "pytest -q"}
 
 
 @pytest.mark.asyncio
 @respx.mock
 async def test_tasks_from_spec_posts_spec_ref():
+    _mock_card_resolution()
     route = respx.post(Config.org_url("agent-runs/tasks-from-spec/")).mock(
         return_value=Response(201, json={"run": {"id": 11}}))
     await _tool("tasks_from_spec")(
         card_ref="ON-914", spec_ref="@spec://requirements")
     assert json.loads(route.calls.last.request.content) == {
-        "card_ref": "ON-914", "spec_ref": "@spec://requirements"}
+        "card_id": CARD_ID, "spec_ref": "@spec://requirements"}
 
 
 @pytest.mark.asyncio

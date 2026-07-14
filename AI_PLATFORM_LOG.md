@@ -400,6 +400,31 @@ Tests: `tests/test_command_tools.py` (6) — invoke posts+human-principal, and e
 typed tool's body/route. Suite 65 passed. Committed on
 `feat/cockpit-command-coverage` (off the redirect-fix branch); unreleased.
 
+## Card AI Cockpit Bridge — run-tool contract fixes (2026-07-14, v0.4.1)
+
+Found live while proving spec-gen → accept → execute end-to-end on a real card:
+
+1. **`start_agent_run` with `card_ref` 500s on the backend** (`FieldError: Cannot
+   resolve keyword 'number'` in the agent-runs card_ref resolver); `card_id` works.
+   Fix: `start_agent_run` + `research_card` / `run_card_tests` / `tasks_from_spec`
+   now resolve `card_ref → story_id` client-side (via `_resolve_card_id`) and send
+   `card_id`, dodging the buggy server-side card_ref path.
+2. **`agent_id` on those tools is the agent's USER id, not the `agent_profile_id`**
+   that `send_cockpit_chat` / `draft_spec_from_card` take — passing a profile id
+   gets "chosen user is not an agent." Fix: docstrings now state it explicitly and
+   point to `get_card_cockpit_context().configured_agents[].user_id` /
+   list_agent_accounts.
+
+Proof (all via the MCP path against the live backend): draft_spec_from_card → Codex
+drafted a 4.4k-char requirements spec → governed accept ladder (viewed →
+evidence-open(proposal_content) → understood → accept) → start_agent_run
+(kind=implement) → Codex planned → governed plan-approval ladder (evidence-open("plan")
+→ understood → approve) → executing → **completed with real code committed + branch
+pushed** (`agent/…codex/28`, commit `a9c21bc`).
+
+Tests updated (card-resolution mocks + `card_id` assertions). Suite 65 passed.
+Committed on `fix/run-tool-contracts` (off main).
+
 ## Sentry Integration (Phase J — SENTRY_INTEGRATION_V3.md)
 
 - **No MCP changes.** Phase J (Sentry) is backend + frontend only; the
