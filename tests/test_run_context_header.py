@@ -87,3 +87,17 @@ async def test_error_body_surfaced_in_exception(monkeypatch):
             await c.post(Config.org_url("agent-runs/"), {})
     msg = str(ei.value)
     assert "409" in msg and "already_active_run_id" in msg
+
+
+@respx.mock
+async def test_redirect_raises_clear_error(monkeypatch):
+    import httpx
+    import pytest
+    monkeypatch.setattr(Config, "agent_run_id", "")
+    respx.get(Config.project_url("stories/1/spec/")).mock(
+        return_value=Response(302, headers={"location": "https://app.spryng.io/"}))
+    async with SpryngClient() as c:
+        with pytest.raises(httpx.HTTPStatusError) as ei:
+            await c.get(Config.project_url("stories/1/spec/"))
+    msg = str(ei.value)
+    assert "302" in msg and "redirect" in msg and "SCRUMDO_BASE_URL" in msg
