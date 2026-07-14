@@ -40,6 +40,8 @@ from .tools import (
     intelligence,
     loops,
     members,
+    memory,
+    notifications,
     search,
     spec,
     spec_proposals,
@@ -127,6 +129,29 @@ Spec proposals — the reviewed alternative to editing the spec directly:
   proposal's current version, 10-min TTL) → accept_spec_proposal(...,
   confirm_token=<token>).
 
+Shared cognition (slice 10) — the board's governed memory:
+  - Starting work on a card? Call get_handoff_brief(card_ref) FIRST —
+    recent events, new constraints/decisions, and the live blackboard,
+    so you don't repeat what another actor already did.
+  - Know the rules: get_room_context() (the room library every card
+    inherits) and get_card_memory(card_ref) (this card's saved context).
+  - Learned or tried something? post_blackboard_note(card_ref, body,
+    kind) — ALLOWED for agents, ungated. Notes expire in 7 days and are
+    never durable unless a human promotes them. Use kind='gotcha' for
+    traps, 'fact' for findings.
+  - HUMAN-only (backend 403s agent tokens; do not retry on denial):
+    promote_blackboard_note, add_card_memory, add_room_context,
+    curate_room_context, run_distiller, resolve_memory_dispute.
+  - list_memory_disputes shows contradicting entries; while a dispute is
+    open none of its members reach any agent.
+
+Notifications — the in-app message center for YOUR identity:
+  - Poll notification_counts() / list_notifications(status='unread')
+    between work units to catch "plan approved" / "changes requested"
+    without re-fetching whole cards.
+  - After acting on a message, mark_notification(id, 'acknowledge') so
+    humans watching the queue see it handled.
+
 If you are running as an AI agent (BOARD_AI_AGENTS_UNIFIED_SPEC §13.4):
   1. Call get_agent_identity() first; capture current_run_id.
   2. If a run is active, set SPRYNG_AGENT_RUN_ID in the environment so
@@ -166,6 +191,8 @@ tasks.register(mcp)
 comments.register(mcp)
 fields.register(mcp)
 members.register(mcp)
+memory.register(mcp)
+notifications.register(mcp)
 search.register(mcp)
 activity.register(mcp)
 attachments.register(mcp)

@@ -462,6 +462,93 @@ class SpryngClient:
         story_id = await self._resolve_card_id(card_ref)
         return await self.post(Config.project_url(f"stories/{story_id}/time_entries/"), body)
 
+    # ── Shared cognition (slice 10): blackboard / saved context / handoff ─────
+    #
+    # The card BLACKBOARD is the working tier — agent tokens may post notes
+    # ungated (they expire on their own; TTL 7 days). Durable SAVED CONTEXT is
+    # human-curated: promotion and direct writes are rejected for agent tokens
+    # by the backend; the tools exist so human-token sessions can curate.
+
+    async def get_handoff_brief(self, card_ref: str, since: str | None = None) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        params = {"since": since} if since else {}
+        return await self.get(
+            Config.project_url(f"stories/{story_id}/handoff-brief/"), **params)
+
+    async def read_blackboard(self, card_ref: str) -> list[dict]:
+        story_id = await self._resolve_card_id(card_ref)
+        data = await self.get(Config.project_url(f"stories/{story_id}/blackboard/"))
+        return data if isinstance(data, list) else data.get("entries", data)
+
+    async def post_blackboard_note(self, card_ref: str, body: dict[str, Any]) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        return await self.post(
+            Config.project_url(f"stories/{story_id}/blackboard/"), body)
+
+    async def blackboard_action(self, card_ref: str, entry_id: int,
+                                action: str, body: dict[str, Any] | None = None) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        return await self.post(
+            Config.project_url(f"stories/{story_id}/blackboard/{entry_id}/{action}/"),
+            body or {})
+
+    async def get_card_memory(self, card_ref: str) -> list[dict]:
+        story_id = await self._resolve_card_id(card_ref)
+        data = await self.get(Config.project_url(f"stories/{story_id}/memory/"))
+        return data if isinstance(data, list) else data.get("entries", data)
+
+    async def add_card_memory(self, card_ref: str, body: dict[str, Any]) -> dict:
+        story_id = await self._resolve_card_id(card_ref)
+        return await self.post(Config.project_url(f"stories/{story_id}/memory/"), body)
+
+    async def get_room_context(self) -> list[dict]:
+        data = await self.get(Config.project_url("memory/"))
+        return data if isinstance(data, list) else data.get("entries", data)
+
+    async def add_room_context(self, body: dict[str, Any]) -> dict:
+        return await self.post(Config.project_url("memory/"), body)
+
+    async def room_context_action(self, entry_id: int, action: str) -> dict:
+        return await self.post(Config.project_url(f"memory/{entry_id}/{action}/"), {})
+
+    async def run_distiller(self) -> dict:
+        return await self.post(Config.project_url("memory/distill/"), {})
+
+    async def list_memory_disputes(self) -> list[dict]:
+        data = await self.get(Config.project_url("disputes/"))
+        return data if isinstance(data, list) else data.get("disputes", data)
+
+    async def resolve_memory_dispute(self, dispute_id: int,
+                                     winner_id: int | None = None) -> dict:
+        body: dict[str, Any] = {}
+        if winner_id is not None:
+            body["winner_id"] = winner_id
+        return await self.post(
+            Config.project_url(f"disputes/{dispute_id}/resolve/"), body)
+
+    # ── Notifications (org-scoped in-app message center) ──────────────────────
+
+    async def list_notifications(self, *, status: str | None = None,
+                                 category: str | None = None,
+                                 limit: int = 50) -> dict:
+        params: dict[str, Any] = {"limit": limit}
+        if status:
+            params["status"] = status
+        if category:
+            params["category"] = category
+        return await self.get(Config.org_url("notifications/messages/"), **params)
+
+    async def notification_counts(self) -> dict:
+        return await self.get(Config.org_url("notifications/messages/counts/"))
+
+    async def notification_action(self, message_id: int, action: str) -> dict:
+        return await self.post(
+            Config.org_url(f"notifications/messages/{message_id}/{action}/"), {})
+
+    async def mark_all_notifications_read(self) -> dict:
+        return await self.post(
+            Config.org_url("notifications/messages/mark-all-read/"), {})
+
     # ── Attachments (write-only) ───────────────────────────────────────────────
     #
     # This client deliberately exposes upload only. No list/get/download
