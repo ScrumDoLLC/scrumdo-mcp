@@ -110,7 +110,25 @@ class SpryngClient:
             )
         target_number = int(parts[1])
 
-        # Scan story list pages (100 items/page, max ~10 pages for most boards)
+        # Fast path: `?number=` server-side filter (ScrumDo-2026+). On older
+        # backends the param is ignored and the full first page comes back —
+        # the match-scan below handles both, and we only fall through to the
+        # full pagination walk when the filtered page didn't contain the card.
+        try:
+            data = await self.get(
+                Config.project_url("stories/"),
+                page=1, page_size=100, number=target_number,
+            )
+            items = data.get("items", []) if isinstance(data, dict) else data
+            for story in items:
+                if story.get("number") == target_number:
+                    story_id = story["id"]
+                    self._card_id_cache[card_ref] = story_id
+                    return story_id
+        except Exception:
+            pass  # never let the fast path break resolution
+
+        # Fallback: scan story list pages (100 items/page)
         page = 1
         while True:
             data = await self.get(
@@ -119,7 +137,7 @@ class SpryngClient:
             items = data.get("items", []) if isinstance(data, dict) else data
             for story in items:
                 if story.get("number") == target_number:
-                    story_id: int = story["id"]
+                    story_id = story["id"]
                     self._card_id_cache[card_ref] = story_id
                     return story_id
             # Stop when there are no more pages
@@ -548,6 +566,19 @@ class SpryngClient:
     async def mark_all_notifications_read(self) -> dict:
         return await self.post(
             Config.org_url("notifications/messages/mark-all-read/"), {})
+
+    async def wait_for_notifications(self, *, after: int = 0,
+                                     timeout_s: int = 25) -> dict:
+        """Long-poll the wait endpoint: the server holds the request until a
+        message newer than ``after`` arrives (or the timeout elapses). The
+        HTTP read timeout is stretched to cover the server-side hold."""
+        r = await self._http.get(
+            Config.org_url("notifications/messages/wait/"),
+            params={"after": after, "timeout": timeout_s},
+            timeout=httpx.Timeout(10.0, read=timeout_s + 15.0),
+        )
+        self._raise_for_status(r)
+        return r.json()
 
     # ── Attachments (write-only) ───────────────────────────────────────────────
     #

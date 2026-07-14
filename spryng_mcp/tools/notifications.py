@@ -73,3 +73,24 @@ def register(mcp: FastMCP) -> None:
         """Mark every unread notification as read for this identity."""
         async with SpryngClient() as c:
             return await c.mark_all_notifications_read()
+
+    @mcp.tool()
+    async def wait_for_notifications(after: int = 0, timeout_s: int = 25) -> dict:
+        """
+        BLOCK until a new notification arrives (the push channel) — one call
+        replaces a poll-sleep loop. The server holds the request and returns
+        the moment a message newer than ``after`` lands, or after
+        ``timeout_s`` with an empty page.
+
+        Args:
+            after:     Cursor from the previous call's 'cursor' field
+                       (0 = anything currently unread returns immediately).
+            timeout_s: Seconds to wait server-side (capped at 30).
+
+        Returns {'results': [...], 'count': N, 'cursor': M}. ALWAYS pass the
+        returned cursor into your next call — an empty result with the same
+        cursor just means "nothing new yet; call again".
+        """
+        async with SpryngClient() as c:
+            return await c.wait_for_notifications(
+                after=after, timeout_s=timeout_s)

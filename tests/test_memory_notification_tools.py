@@ -157,3 +157,45 @@ async def test_notifications_list_params_and_actions():
     assert ack.called and mar.called
     q = dict(lst.calls.last.request.url.params)
     assert q["status"] == "unread" and q["limit"] == "10"
+
+
+# ── Wait channel + number fast-path resolution ────────────────────────────────
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_wait_for_notifications_params_and_cursor():
+    route = respx.get(f"{ORG}/notifications/messages/wait/").respond(
+        200, json={"results": [{"id": 9}], "count": 1, "cursor": 9})
+    async with SpryngClient() as c:
+        out = await c.wait_for_notifications(after=4, timeout_s=7)
+    assert out["cursor"] == 9
+    q = dict(route.calls.last.request.url.params)
+    assert q["after"] == "4" and q["timeout"] == "7"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_number_fast_path_single_request():
+    route = respx.get(f"{PROJ}/stories/").respond(200, json={
+        "count": 1, "next": None, "items": [{"id": CARD_ID, "number": 914}]})
+    async with SpryngClient() as c:
+        assert await c._resolve_card_id("ON-914") == CARD_ID
+    assert len(route.calls) == 1
+    assert dict(route.calls.last.request.url.params)["number"] == "914"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_falls_back_when_number_param_ignored():
+    # Old backend: the number param is ignored; page 1 lacks the card, page 2
+    # has it. Call 1 = fast path (miss), calls 2-3 = the pagination walk.
+    pages = [
+        {"count": 2, "next": "p2", "items": [{"id": 1, "number": 1}]},
+        {"count": 2, "next": "p2", "items": [{"id": 1, "number": 1}]},
+        {"count": 2, "next": None, "items": [{"id": CARD_ID, "number": 914}]},
+    ]
+    route = respx.get(f"{PROJ}/stories/")
+    route.side_effect = [Response(200, json=p) for p in pages]
+    async with SpryngClient() as c:
+        assert await c._resolve_card_id("ON-914") == CARD_ID
+    assert len(route.calls) == 3
