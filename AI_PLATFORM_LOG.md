@@ -24,6 +24,21 @@ signatures per spec §13.3).
 
 ## Decision Log
 
+- **Evidence is delivery, not attestation (0.4.4):** the accept gate wants an
+  `understood` disposition backed by a `review_evidence_opened` event from the
+  same actor. Only the backend's workbench *reader*
+  (`GET workbench/proposals/<id>/`) mints that event — it treats delivering the
+  content as the evidence (Gate Protocol #1), exactly as the web reader does.
+  We shipped `preview-decision/` and `understood/` but not the reader, so a
+  human on an MCP client could not satisfy the gate at all: accept returned
+  `needs_understood` and the only ways through were the web UI or forging the
+  disposition. `read_spec_proposal` closes it. This is not a loosening — the
+  evidence still records a real delivery of the proposal to a human, and
+  `understood` remains a separate explicit act. The same gap still exists for
+  `agent_plan` (approve_agent_plan): there is no workbench reader for plans, so
+  plan approval from MCP is still unreachable. Fixing it needs a backend
+  `WbPlanHandler` + generalising `_record_delivery`, which hardcodes the
+  `spec_proposal` surface.
 - **Q-X2 (exact pins):** all runtime deps now pinned `==X.Y.Z` in
   `pyproject.toml`. Major bumps will require two reviewer approvals
   per spec §3a.3.
