@@ -243,9 +243,20 @@ def register(mcp: FastMCP) -> None:
     # accept/reject/request_changes without a `confirm_token` that proves you
     # previewed the exact current version. The flow is:
     #   1. get_decision_inbox()                → what's awaiting your decision
-    #   2. (optional) attest_spec_understood() → record you reviewed it
-    #   3. preview_spec_decision(id, action)   → mint a confirm_token (10-min TTL)
-    #   4. accept/reject/request_changes(..., confirm_token=<token>)
+    #   2. read_spec_proposal(id)              → the content. The delivery IS the
+    #                                            evidence: this read records the
+    #                                            evidence-open + viewed the gate
+    #                                            requires. Nothing else mints it.
+    #   3. attest_spec_understood(id)          → record you understood it
+    #   4. preview_spec_decision(id, action)   → mint a confirm_token (10-min TTL)
+    #   5. accept/reject/request_changes(..., confirm_token=<token>)
+    #
+    # Steps 2+3 are REQUIRED when the org has governed_review_sessions_enabled:
+    # accept demands an `understood` disposition backed by a
+    # `review_evidence_opened` event from the SAME actor, so skipping the read
+    # fails with gate=needs_understood ("open the evidence before accepting").
+    # With the feature off, the backend takes the ungoverned accept path and
+    # neither is needed.
 
     @mcp.tool()
     async def get_decision_inbox() -> dict:
@@ -258,6 +269,33 @@ def register(mcp: FastMCP) -> None:
         """
         async with SpryngClient() as c:
             return await c.get(Config.org_url("decision-inbox/"))
+
+    @mcp.tool()
+    async def read_spec_proposal(proposal_id: str) -> dict:
+        """Read a spec proposal's full content through the MCP Workbench.
+
+        This is the human reading surface for a proposal, and the only MCP path
+        that satisfies the accept gate's evidence requirement: the backend holds
+        that delivering the content IS the evidence (Gate Protocol #1), so this
+        read records `review_evidence_opened` + `viewed` for you — the same
+        events the web reader records when it renders the proposal to a human.
+
+        Call this BEFORE attest_spec_understood / accept_spec_proposal. The gate
+        rejects an accept whose actor never had the content delivered, even if
+        an `understood` row exists (defense in depth).
+
+        Only a human principal may call this.
+
+        Args:
+            proposal_id: The proposal's public_id (UUID).
+
+        Returns {proposal, gate, web_path}, where `gate` reports session_id,
+        evidence_opened, viewed, understood, can_accept, and any blocking
+        annotation counts.
+        """
+        async with SpryngClient(human_principal=True) as c:
+            return await c.get(
+                Config.org_url(f"workbench/proposals/{proposal_id}/"))
 
     @mcp.tool()
     async def preview_spec_decision(proposal_id: str, action: str) -> dict:

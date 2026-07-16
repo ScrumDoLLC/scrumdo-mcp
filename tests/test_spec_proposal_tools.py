@@ -172,6 +172,31 @@ async def test_preview_spec_decision_posts_action_and_returns_token():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_read_spec_proposal_gets_workbench_reader_as_human(monkeypatch):
+    # The reader is the ONLY MCP call that mints the accept gate's evidence
+    # (the backend records evidence-open + viewed on delivery), so it must hit
+    # the workbench reader route and run as a human principal — an agent run
+    # header riding along would attribute a human's evidence to an agent.
+    monkeypatch.setattr(Config, "agent_run_id", "run-99")
+    route = respx.get(
+        Config.org_url(f"workbench/proposals/{PROPOSAL_UUID}/")
+    ).mock(return_value=Response(200, json={
+        "proposal": {"status": "ready", "proposed_content": "# Spec"},
+        "gate": {"evidence_opened": True, "viewed": True,
+                 "understood": False, "can_accept": True},
+        "web_path": "/organization/o/board/p#story-1"}))
+    result = await _tool("read_spec_proposal")(proposal_id=PROPOSAL_UUID)
+
+    assert route.called
+    assert "x-spryng-agent-run" not in route.calls.last.request.headers
+    assert result["gate"]["evidence_opened"] is True
+    # Delivery proves evidence, not comprehension: understood stays the human's
+    # explicit act via attest_spec_understood.
+    assert result["gate"]["understood"] is False
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_get_decision_inbox():
     respx.get(Config.org_url("decision-inbox/")).mock(
         return_value=Response(200, json={"items": [{"proposal_id": PROPOSAL_UUID}]}))
