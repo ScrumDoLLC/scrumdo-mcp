@@ -76,9 +76,20 @@ Find your tool's MCP config file and add the `scrumdo` server entry:
 
 | Tool | Config file |
 |------|-------------|
-| Claude Code | `~/.claude/claude.json` |
+| Claude Code | `~/.claude.json` (home dir — **not** `~/.claude/claude.json`) |
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) · `%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
 | Cursor | `~/.cursor/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+
+> **Claude Code — the reliable way.** Rather than hand-editing the JSON (it's easy to edit the wrong `~/.claude/claude.json` by mistake), let the CLI write it:
+>
+> ```bash
+> claude mcp add scrumdo \
+>   -e SCRUMDO_TOKEN=your-token-here \
+>   -e SCRUMDO_ORG=your-org-slug \
+>   -e SCRUMDO_PROJECT=your-project-slug \
+>   -- scrumdo-mcp
+> ```
 
 ```json
 {
